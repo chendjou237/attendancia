@@ -127,6 +127,37 @@ class SessionBuilder
     }
 
     /**
+     * Re-derives the individual teaching-period slots a persisted session
+     * covers, by re-running the same timetable query group() uses,
+     * scoped to this session's own boundaries. No pivot table stores
+     * this redundantly — session_id + slot_id on period_results is
+     * enough, and re-deriving keeps the timetable the single source of
+     * truth (as long as it hasn't changed since the session was built;
+     * see the no-deletion note on persist()).
+     *
+     * @return Collection<int, PeriodSlot>
+     */
+    public function periodSlotsFor(AttendanceSession $session): Collection
+    {
+        $version = $session->teacher->timetableVersionFor($session->date);
+
+        if ($version === null) {
+            return collect();
+        }
+
+        return $version->entries()
+            ->where('day_of_week', $session->date->dayOfWeek)
+            ->where('class_code_id', $session->class_code_id)
+            ->where('room_id', $session->room_id)
+            ->with('slot')
+            ->get()
+            ->pluck('slot')
+            ->filter(fn (PeriodSlot $slot) => $slot->seq >= $session->firstSlot->seq && $slot->seq <= $session->lastSlot->seq)
+            ->sortBy('seq')
+            ->values();
+    }
+
+    /**
      * Persists groupings as AttendanceSession rows, upserted on
      * (teacher_id, date, first_slot_id) so re-running for a date whose
      * timetable hasn't changed is idempotent and never disturbs pairing
