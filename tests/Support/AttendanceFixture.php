@@ -98,10 +98,17 @@ class AttendanceFixture
 
     public function scanAt(string $time, ?Device $device = null): void
     {
+        // Both set to the same instant: PairingEngine reads
+        // event_time_device (falling back to event_time_server only
+        // when the device timestamp is null), and a live scan has the
+        // two only seconds apart in reality.
+        $at = Carbon::parse($this->date->toDateString().' '.$time, config('attendance.timezone'))->utc();
+
         \App\Models\RawEvent::factory()->create([
             'device_id' => ($device ?? $this->device)->id,
             'teacher_id' => $this->teacher->id,
-            'event_time_server' => Carbon::parse($this->date->toDateString().' '.$time, config('attendance.timezone'))->utc(),
+            'event_time_device' => $at,
+            'event_time_server' => $at,
         ]);
     }
 }

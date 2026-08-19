@@ -71,8 +71,6 @@ it('writes LOCATION_MISMATCH status when that is the session anomaly', function 
     $results = computeSession($f);
 
     expect($results->first()->status)->toBe(PeriodStatus::LocationMismatch);
-
-    config(['attendance.enforce_location' => false]);
 });
 
 it('is idempotent under the same rule_version: recomputing reuses the same row', function () {
@@ -114,4 +112,33 @@ it('preserves the old row when a new rule_version recomputes, flipping is_curren
     expect($oldRow->status)->toBe(PeriodStatus::Present); // untouched
 
     expect($newResult->is_current)->toBeTrue();
+});
+
+// Regression: RuleEngine originally read event_time_server off the
+// paired scan events (when they were ingested), not event_time_device
+// (when the scan actually happened) — see PairingEngine's equivalent
+// regression test for the full explanation. For a backfilled session
+// this compared "now" against the period's real grace window and
+// produced ABSENT regardless of how the teacher actually scanned.
+it('evaluates the covering rule using event_time_device, not a stale event_time_server', function () {
+    $f = AttendanceFixture::make(
+        [['07:30:00', '08:25:00']],
+        ['grace_late_minutes' => 10, 'grace_early_minutes' => 15, 'pair_window_before_minutes' => 60, 'pair_window_after_minutes' => 60, 'min_session_minutes' => 1],
+    );
+
+    $scanInAt = \Carbon\Carbon::parse($f->date->toDateString().' 07:28:00', config('attendance.timezone'))->utc();
+    $scanOutAt = \Carbon\Carbon::parse($f->date->toDateString().' 08:25:00', config('attendance.timezone'))->utc();
+
+    \App\Models\RawEvent::factory()->create([
+        'device_id' => $f->device->id, 'teacher_id' => $f->teacher->id,
+        'event_time_device' => $scanInAt, 'event_time_server' => now(),
+    ]);
+    \App\Models\RawEvent::factory()->create([
+        'device_id' => $f->device->id, 'teacher_id' => $f->teacher->id,
+        'event_time_device' => $scanOutAt, 'event_time_server' => now(),
+    ]);
+
+    $results = computeSession($f);
+
+    expect($results->first()->status)->toBe(PeriodStatus::Present);
 });

@@ -8,6 +8,7 @@ use App\Services\Hikvision\JsonStreamParser;
 use App\Services\Hikvision\StreamConsumer;
 use App\Services\Hikvision\StreamIdleTimeoutException;
 use Illuminate\Console\Command;
+use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Str;
@@ -84,11 +85,22 @@ class DumpHikvisionEvents extends Command
         // §7's stream worker notes: no HTTP timeout on the stream
         // connection, or the default 30s kills it long before this
         // command's own --seconds bound is reached.
-        $response = Http::withDigestAuth($user, $pass)
-            ->connectTimeout(10)
-            ->timeout(0)
-            ->withOptions(['stream' => true])
-            ->get("http://{$device->ip}/ISAPI/Event/notification/alertStream");
+        //
+        // connectTimeout() only bounds establishing the TCP connection —
+        // an unreachable host fails before that with ConnectionException
+        // rather than a Response, so this must be a try/catch (see
+        // StreamHikvisionEvents for where this was first caught missing).
+        try {
+            $response = Http::withDigestAuth($user, $pass)
+                ->connectTimeout(10)
+                ->timeout(0)
+                ->withOptions(['stream' => true])
+                ->get("http://{$device->ip}/ISAPI/Event/notification/alertStream");
+        } catch (ConnectionException $e) {
+            $this->error("Stream connection failed: {$e->getMessage()}");
+
+            return;
+        }
 
         if (! $response->successful()) {
             $this->error("Stream request failed: HTTP {$response->status()}");

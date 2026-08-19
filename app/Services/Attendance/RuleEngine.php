@@ -66,8 +66,13 @@ class RuleEngine
 
         $tz = config('attendance.timezone');
         $date = $session->date->toDateString();
-        $scanIn = $session->scanInEvent->event_time_server;
-        $scanOut = $session->scanOutEvent->event_time_server;
+        // effectiveTime(), not event_time_server — see PairingEngine's
+        // docblock. A backfilled event's event_time_server is whenever
+        // ingestion happened to run, not when the scan occurred; using
+        // it here would compare "now" against the period's real window
+        // and silently misjudge every backfilled result.
+        $scanIn = $session->scanInEvent->effectiveTime();
+        $scanOut = $session->scanOutEvent->effectiveTime();
 
         return $slots->map(function (PeriodSlot $slot) use ($session, $rule, $tz, $date, $scanIn, $scanOut) {
             $periodStart = Carbon::parse($date.' '.$slot->start_time, $tz)->utc();

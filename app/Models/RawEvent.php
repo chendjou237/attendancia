@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use Carbon\Carbon;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
@@ -40,5 +41,19 @@ class RawEvent extends Model
     public function teacher(): BelongsTo
     {
         return $this->belongsTo(Teacher::class);
+    }
+
+    /**
+     * When the scan actually happened, not when we ingested it — the
+     * two are nearly identical for a live-stream event but can be
+     * hours or days apart for a backfilled one, which is exactly the
+     * case pairing must get right (§7.2: backfill is the primary
+     * recovery path here, not a fallback). Falls back to
+     * event_time_server only when the device's own timestamp failed to
+     * parse (EventNormalizer leaves event_time_device null in that case).
+     */
+    public function effectiveTime(): Carbon
+    {
+        return $this->event_time_device ?? $this->event_time_server;
     }
 }

@@ -16,14 +16,6 @@ function pairedSession(AttendanceFixture $f): \App\Models\AttendanceSession
     return $session->fresh(['firstSlot', 'lastSlot']);
 }
 
-// config() mutations aren't reset between tests in this file by
-// RefreshDatabase, which only resets the database — without this, a
-// test that sets enforce_location leaks it into whichever test runs
-// next.
-afterEach(function () {
-    config(['attendance.enforce_location' => false]);
-});
-
 it('pairs a normal scan-in and scan-out', function () {
     $f = AttendanceFixture::make();
     $session = pairedSession($f);
@@ -126,10 +118,12 @@ it('lets one boundary scan serve as scan-out of one session and scan-in of the n
     $sessionB = $sessions[1]->fresh(['firstSlot', 'lastSlot']);
 
     $f->scanAt('07:28:00');
+    $boundaryAt = \Carbon\Carbon::parse($f->date->toDateString().' 08:25:00', config('attendance.timezone'))->utc();
     $boundary = \App\Models\RawEvent::factory()->create([
         'device_id' => $f->device->id,
         'teacher_id' => $f->teacher->id,
-        'event_time_server' => \Carbon\Carbon::parse($f->date->toDateString().' 08:25:00', config('attendance.timezone'))->utc(),
+        'event_time_device' => $boundaryAt,
+        'event_time_server' => $boundaryAt,
     ]);
     $f->scanAt('09:15:00');
 
@@ -158,4 +152,36 @@ it('pairs successfully across corridors when enforce_location is off (the defaul
 
     expect($session->state)->toBe(SessionState::Paired);
     expect($session->anomaly_code)->toBeNull();
+});
+
+// Regression: PairingEngine originally queried event_time_server (when
+// the event was ingested), not event_time_device (when the scan
+// actually happened). The two are seconds apart for a live event, but
+// a backfilled event's event_time_server is whenever the backfill
+// command happened to run — for real downtime recovery (§7.2's primary
+// path, not a fallback) that can be hours or days after the scan.
+// Caught via the demo data generator simulating historical dates,
+// where the gap is large enough to be unmissable.
+it('pairs using event_time_device, not event_time_server, so backfilled events with a stale ingestion time still pair', function () {
+    $f = AttendanceFixture::make();
+    $session = pairedSession($f);
+
+    $scanInAt = \Carbon\Carbon::parse($f->date->toDateString().' 07:28:00', config('attendance.timezone'))->utc();
+    $scanOutAt = \Carbon\Carbon::parse($f->date->toDateString().' 08:20:00', config('attendance.timezone'))->utc();
+
+    // event_time_server left at "now" — days after the simulated scan,
+    // exactly like a real backfill run.
+    \App\Models\RawEvent::factory()->create([
+        'device_id' => $f->device->id, 'teacher_id' => $f->teacher->id,
+        'event_time_device' => $scanInAt, 'event_time_server' => now(),
+    ]);
+    \App\Models\RawEvent::factory()->create([
+        'device_id' => $f->device->id, 'teacher_id' => $f->teacher->id,
+        'event_time_device' => $scanOutAt, 'event_time_server' => now(),
+    ]);
+
+    (new PairingEngine)->pair($session, $f->rule);
+    $session->refresh();
+
+    expect($session->state)->toBe(SessionState::Paired);
 });

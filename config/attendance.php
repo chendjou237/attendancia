@@ -81,4 +81,16 @@ return [
     */
     'backfill_hours' => env('HIKVISION_BACKFILL_HOURS', 48),
 
+    /*
+    |--------------------------------------------------------------------------
+    | Clock drift alert threshold
+    |--------------------------------------------------------------------------
+    |
+    | §7.5: "alert when offset exceeds threshold." With a 10-minute
+    | grace rule, four minutes of drift is already a pay dispute — 240s
+    | is a starting point, not a value confirmed with the school.
+    |
+    */
+    'clock_drift_threshold_seconds' => env('HIKVISION_CLOCK_DRIFT_THRESHOLD', 240),
+
 ];

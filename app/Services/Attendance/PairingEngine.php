@@ -18,6 +18,17 @@ use Illuminate\Support\Facades\Log;
  *             through session_end
  *   scan-out: latest event from scan-in through session_end + pair_window_after
  *
+ * All comparisons use RawEvent::effectiveTime() (event_time_device,
+ * falling back to event_time_server) — never event_time_server alone.
+ * For a live-stream event the two are seconds apart, but a backfilled
+ * event's event_time_server is whenever the backfill command happened
+ * to run, which has nothing to do with when the scan occurred; using
+ * it here would leave every backfilled session unpairable, silently
+ * defeating §7.2's primary recovery path. Caught via the demo data
+ * generator simulating historical dates, where the gap between "when
+ * the scan happened" and "when it was ingested" is large enough to be
+ * unmissable — the same gap a multi-day outage produces for real.
+ *
  * Plus four decisions layered on top of the plain rule:
  *   - debounce: successive scans from the same teacher inside
  *     min_scan_gap_seconds collapse to one before pairing (finding 1.4 —
@@ -51,10 +62,15 @@ class PairingEngine
         $allEvents = $this->debounce(
             RawEvent::query()
                 ->where('teacher_id', $session->teacher_id)
-                ->whereBetween('event_time_server', [$windowStart, $windowEnd])
+                ->where(function ($q) use ($windowStart, $windowEnd) {
+                    $q->whereBetween('event_time_device', [$windowStart, $windowEnd])
+                        ->orWhere(fn ($q2) => $q2->whereNull('event_time_device')
+                            ->whereBetween('event_time_server', [$windowStart, $windowEnd]));
+                })
                 ->with('device')
-                ->orderBy('event_time_server')
-                ->get(),
+                ->get()
+                ->sortBy(fn (RawEvent $e) => $e->effectiveTime())
+                ->values(),
             $rule->min_scan_gap_seconds,
         );
 
@@ -63,7 +79,7 @@ class PairingEngine
             : $allEvents;
 
         $scanIn = $candidates->first(
-            fn (RawEvent $e) => $e->event_time_server->betweenIncluded($windowStart, $sessionEnd)
+            fn (RawEvent $e) => $e->effectiveTime()->betweenIncluded($windowStart, $sessionEnd)
         );
 
         if ($scanIn === null) {
@@ -97,7 +113,7 @@ class PairingEngine
         // that no scan-out ever arrived.
         $scanOut = $candidates
             ->filter(fn (RawEvent $e) => $e->id !== $scanIn->id
-                && $e->event_time_server->betweenIncluded($scanIn->event_time_server, $windowEnd))
+                && $e->effectiveTime()->betweenIncluded($scanIn->effectiveTime(), $windowEnd))
             ->last();
 
         if ($scanOut === null) {
@@ -110,7 +126,7 @@ class PairingEngine
             return;
         }
 
-        $minutes = $scanIn->event_time_server->diffInMinutes($scanOut->event_time_server, true);
+        $minutes = $scanIn->effectiveTime()->diffInMinutes($scanOut->effectiveTime(), true);
 
         $session->scan_in_event_id = $scanIn->id;
         $session->scan_out_event_id = $scanOut->id;
@@ -142,7 +158,7 @@ class PairingEngine
         $lastKept = null;
 
         foreach ($events as $event) {
-            if ($lastKept !== null && $event->event_time_server->diffInSeconds($lastKept->event_time_server, true) < $gapSeconds) {
+            if ($lastKept !== null && $event->effectiveTime()->diffInSeconds($lastKept->effectiveTime(), true) < $gapSeconds) {
                 continue;
             }
 

@@ -20,6 +20,29 @@ pest()->extend(TestCase::class)
 
 /*
 |--------------------------------------------------------------------------
+| Config reset between tests
+|--------------------------------------------------------------------------
+|
+| RefreshDatabase resets the database between tests, but not the config
+| repository — a test that does config(['attendance.x' => ...]) leaks
+| that value into whichever test happens to run next in the same file,
+| since Pest doesn't rebuild the whole application per test the way
+| plain Laravel test suites sometimes do. Hit this three times while
+| building Phase C before fixing it here once: re-read config/attendance.php
+| fresh before every test rather than trusting whatever an earlier test
+| left in memory. Extend this if another config file starts getting
+| mutated in tests.
+|
+*/
+
+beforeEach(function () {
+    foreach (require base_path('config/attendance.php') as $key => $value) {
+        config(["attendance.{$key}" => $value]);
+    }
+});
+
+/*
+|--------------------------------------------------------------------------
 | Expectations
 |--------------------------------------------------------------------------
 |
