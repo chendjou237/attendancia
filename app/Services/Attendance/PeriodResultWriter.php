@@ -50,12 +50,20 @@ class PeriodResultWriter
                 ->where('rule_version_id', '!=', $rule->id)
                 ->update(['is_current' => false]);
 
-            $result = PeriodResult::query()->firstOrNew([
-                'teacher_id' => $teacher->id,
-                'date' => $date->toDateString(),
-                'slot_id' => $slot->id,
-                'rule_version_id' => $rule->id,
-            ]);
+            // Not firstOrNew(['date' => ...]) — see SessionBuilder::persist()
+            // for why a raw "Y-m-d" lookup value can silently fail to match
+            // an already-saved row once the `date` cast has serialised it.
+            $result = PeriodResult::query()
+                ->where('teacher_id', $teacher->id)
+                ->whereDate('date', $date->toDateString())
+                ->where('slot_id', $slot->id)
+                ->where('rule_version_id', $rule->id)
+                ->first() ?? new PeriodResult([
+                    'teacher_id' => $teacher->id,
+                    'date' => $date->toDateString(),
+                    'slot_id' => $slot->id,
+                    'rule_version_id' => $rule->id,
+                ]);
 
             $result->session_id = $session?->id;
             $result->class_code_id = $classCode->id;
