@@ -23,7 +23,9 @@ class RuleVersionFactory extends Factory
             'min_scan_gap_seconds' => 30,
             'min_session_minutes' => 10,
             'hours_per_period' => 1.00,
-            'valid_from' => now()->subYear()->toDateString(),
+            // Unique by default (valid_from is a unique column) so
+            // unrelated factory calls in the same test don't collide.
+            'valid_from' => fake()->unique()->dateTimeBetween('-3 years', '-2 years')->format('Y-m-d'),
             'created_by' => null,
             'note' => null,
         ];

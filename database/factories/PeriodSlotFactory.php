@@ -16,7 +16,13 @@ class PeriodSlotFactory extends Factory
     {
         return [
             'day_of_week' => 1,
-            'seq' => 1,
+            // Unique by default so unrelated factory calls in the same
+            // test don't collide on (day_of_week, seq, valid_from) —
+            // tests that care about a specific seq override it explicitly.
+            // Capped at 255: seq is an unsignedTinyInteger column, and
+            // SQLite (unlike MySQL) doesn't enforce that range, so this
+            // only surfaces when the same test also runs against MySQL.
+            'seq' => fake()->unique()->numberBetween(1, 255),
             'start_time' => '07:30:00',
             'end_time' => '08:25:00',
             'is_break' => false,
