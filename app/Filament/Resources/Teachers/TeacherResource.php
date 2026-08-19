@@ -5,6 +5,7 @@ namespace App\Filament\Resources\Teachers;
 use App\Filament\Resources\Teachers\Pages\CreateTeacher;
 use App\Filament\Resources\Teachers\Pages\EditTeacher;
 use App\Filament\Resources\Teachers\Pages\ListTeachers;
+use App\Filament\Resources\Teachers\Pages\ManageTimetable;
 use App\Filament\Resources\Teachers\Schemas\TeacherForm;
 use App\Filament\Resources\Teachers\Tables\TeachersTable;
 use App\Models\Teacher;
@@ -45,6 +46,7 @@ class TeacherResource extends Resource
             'index' => ListTeachers::route('/'),
             'create' => CreateTeacher::route('/create'),
             'edit' => EditTeacher::route('/{record}/edit'),
+            'timetable' => ManageTimetable::route('/{record}/timetable'),
         ];
     }
 }

@@ -39,10 +39,13 @@ class PeriodSlot extends Model
      */
     public static function forDate(CarbonInterface $date): Collection
     {
+        // whereDate(), not a plain <=/>= string comparison — see
+        // Teacher::timetableVersionFor() for why a row whose valid_from is
+        // the exact reference day would otherwise be silently excluded.
         return static::query()
             ->where('day_of_week', $date->dayOfWeek)
-            ->where('valid_from', '<=', $date->toDateString())
-            ->where(fn (Builder $q) => $q->whereNull('valid_to')->orWhere('valid_to', '>=', $date->toDateString()))
+            ->whereDate('valid_from', '<=', $date->toDateString())
+            ->where(fn (Builder $q) => $q->whereNull('valid_to')->orWhereDate('valid_to', '>=', $date->toDateString()))
             ->orderBy('seq')
             ->get();
     }

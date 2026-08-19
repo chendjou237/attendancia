@@ -38,8 +38,11 @@ class RuleVersion extends Model
      */
     public static function forDate(CarbonInterface $date): ?self
     {
+        // whereDate() — see Teacher::timetableVersionFor() for why a
+        // plain <= string comparison would silently exclude a version
+        // whose valid_from is the exact reference day.
         return static::query()
-            ->where('valid_from', '<=', $date->toDateString())
+            ->whereDate('valid_from', '<=', $date->toDateString())
             ->orderByDesc('valid_from')
             ->first();
     }
