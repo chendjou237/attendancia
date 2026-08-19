@@ -178,11 +178,18 @@ grid replacement, use the bulk timetable import instead (ask your Admin —
 on the device (worn print, new device, whatever the reason), you or the
 Admin adds a new mapping row here for them rather than editing the old one.
 
-**A day-to-day habit worth building**: check `devices` isn't showing a stale
-`last_seen_at` for the corridor's terminal — a device that's been silent for
-hours either lost power or lost network, and every scan during that window
-is queued on the device itself, not lost, but the sooner it's noticed the
-sooner it's fixed.
+**Device Monitor** — a day-to-day habit worth building: glance at this
+screen and check the corridor's terminal shows **Online** (green), not
+**Silent** (amber, no signal for a while) or **Offline** (red, an hour or
+more, or never connected). A device that's gone quiet either lost power or
+lost network — every scan during that window is queued on the device
+itself, not lost, but the sooner it's noticed the sooner it's fixed. The
+page also shows a live feed of every scan as it lands (device, teacher,
+passed/failed), refreshing on its own every few seconds — no need to
+reload. If there's no device on site yet, or you want to see the feed move
+without walking to the corridor, **Simulate a scan** fires one real scan
+through the same pipeline a live terminal uses, for any teacher who
+already has a biometric ID enrolled.
 
 **Monthly Reports** — your part of month-end close. Use **Generate report**
 (pick the month) once the month is done and the exception queue for it is
