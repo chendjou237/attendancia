@@ -76,12 +76,21 @@ system runs itself.
 - **Manage timetable** (from a teacher's page) — the grid entry screen,
   shaped like the paper timetable: day columns, period rows, class code per
   cell. Good for one-off corrections to a single teacher's grid.
+- **Period Slots** — the bell schedule: each teaching/break period's day,
+  sequence, and start/end time. This is the single most important reference
+  table in the system — every session boundary and every grace window is
+  computed from it — so get the official grid from the school before
+  entering it. It's versioned by `valid_from`/`valid_to` like a timetable,
+  so a mid-year bell-schedule change never rewrites how a past date was
+  resolved; the list defaults to showing only the version active today.
 - **Teacher Biometric IDs** — maps a device-side fingerprint ID to a
   teacher. Most teachers only ever need one row. If someone's fingerprint
   wears out and they get re-enrolled on the device with a new ID, add a
   *new* row for them rather than editing the old one — assigning a new ID
   automatically closes out the previous mapping, so historic scans still
   resolve correctly to the same teacher.
+- **Users** — create logins for the other three roles (and any additional
+  admins): name, email, password, and one of the four roles.
 - **Audit log** — every override anywhere in the system, with who did it,
   when, and why. Useful when a number is questioned months later.
 
@@ -134,18 +143,6 @@ teacher's whole grid for that `valid_from` to match the file exactly — so if
 you drop a row from the file and re-import, that cell is removed too. That
 also means a timetable file should always contain the *complete* grid for
 that teacher/date, not just the rows that changed.
-
-**Not yet self-service, still needs the command line:**
-
-- The **bell schedule** (period start/end times) has no admin screen yet.
-
-This is documented with copy-pasteable commands in [docs/setup.md](setup.md)
-§8. If you're doing this often, it's worth asking for a proper screen to be
-built — but for now, one-time setup per term is the expected frequency.
-
-**Creating logins** for other staff has its own screen now — **Users**, in
-the admin panel (name, email, password, and one of the four roles). See
-[docs/setup.md](setup.md) §9.
 
 ---
 

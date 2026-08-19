@@ -21,6 +21,7 @@ class ListMonthlyReports extends ListRecords
             Action::make('generate')
                 ->label('Generate report')
                 ->icon(Heroicon::OutlinedSparkles)
+                ->visible(fn () => auth()->user()?->hasAnyRole(['admin', 'officer']) ?? false)
                 ->schema([
                     DatePicker::make('month')
                         ->required()

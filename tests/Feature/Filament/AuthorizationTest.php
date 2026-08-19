@@ -6,7 +6,10 @@ use App\Filament\Resources\CalendarDays\CalendarDayResource;
 use App\Filament\Resources\ClassCodes\ClassCodeResource;
 use App\Filament\Resources\Corridors\CorridorResource;
 use App\Filament\Resources\Devices\DeviceResource;
+use App\Filament\Resources\MonthlyReports\MonthlyReportResource;
+use App\Filament\Resources\MonthlyReports\Pages\ListMonthlyReports;
 use App\Filament\Resources\Notices\NoticeResource;
+use App\Filament\Resources\PeriodSlots\PeriodSlotResource;
 use App\Filament\Resources\Rooms\RoomResource;
 use App\Filament\Resources\RuleVersions\RuleVersionResource;
 use App\Filament\Resources\TeacherBiometricIds\TeacherBiometricIdResource;
@@ -48,6 +51,7 @@ dataset('adminOnlyResources', [
     'calendar days' => [CalendarDayResource::class],
     'rule versions' => [RuleVersionResource::class],
     'users' => [UserResource::class],
+    'period slots' => [PeriodSlotResource::class],
 ]);
 
 it('lets admin view admin-only resources', function (string $resourceClass) {
@@ -157,3 +161,23 @@ it('blocks principal and hr from teachers entirely', function (string $role) {
     $this->get(TeacherResource::getUrl('index'))->assertForbidden();
     $this->get(TeacherResource::getUrl('timetable', ['record' => $teacher]))->assertForbidden();
 })->with(['principal', 'hr']);
+
+it('lets every role view monthly reports, but only admin and officer generate one', function (string $role) {
+    loginAs($role);
+
+    $this->get(MonthlyReportResource::getUrl('index'))->assertSuccessful();
+})->with(['admin', 'officer', 'principal', 'hr']);
+
+it('shows the generate action to admin and officer, hides it from principal and hr', function () {
+    loginAs('admin');
+    Livewire::test(ListMonthlyReports::class)->assertActionVisible('generate');
+
+    loginAs('officer');
+    Livewire::test(ListMonthlyReports::class)->assertActionVisible('generate');
+
+    loginAs('principal');
+    Livewire::test(ListMonthlyReports::class)->assertActionHidden('generate');
+
+    loginAs('hr');
+    Livewire::test(ListMonthlyReports::class)->assertActionHidden('generate');
+});

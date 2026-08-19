@@ -53,4 +53,17 @@ class MonthlyReportResource extends Resource
     {
         return false;
     }
+
+    /**
+     * All four roles have a real reason to be here (docs/onboarding.md
+     * §1-4): Officer generates/reviews, Principal approves, HR reads
+     * the finished ones, Admin oversees. Generating is separately
+     * restricted to admin/officer on the header action itself
+     * (ListMonthlyReports) — viewing the list isn't the same as being
+     * allowed to kick off a new computation.
+     */
+    public static function canViewAny(): bool
+    {
+        return auth()->user()?->hasAnyRole(['admin', 'officer', 'principal', 'hr']) ?? false;
+    }
 }

@@ -279,9 +279,11 @@ further `tinker` needed.
 
 **Role boundaries are enforced**: each role only sees the Filament resources
 relevant to it (Officer: Exception Queue, Manage Timetable, Teacher
-Biometric IDs; Principal: Exception Queue, Audit Log; HR: nothing dedicated
-yet; Admin: everything, including Users). See the [onboarding
-guide](onboarding.md) for what each role is actually responsible for.
+Biometric IDs, Monthly Reports (generate/review); Principal: Exception
+Queue, Audit Log, Monthly Reports (approve); HR: Monthly Reports
+(read-only — no generate button); Admin: everything, including Users and
+Period Slots). See the [onboarding guide](onboarding.md) for what each role
+is actually responsible for.
 
 ---
 

@@ -17,6 +17,21 @@ use Illuminate\Support\Carbon;
 
 class AttendanceOverview extends StatsOverviewWidget
 {
+    /**
+     * These stats are live, in-progress numbers — pending exceptions,
+     * this month's running present/absent/hours before any report has
+     * been approved. HR's whole job is reading the *frozen*, approved
+     * Monthly Reports instead (docs/onboarding.md §4: "there's
+     * deliberately no way to pull an unfinished month's numbers" from
+     * anywhere but that screen), so showing this operational snapshot
+     * to HR — including a Pending Exceptions stat linking to a page
+     * they're not authorized to open — would contradict that.
+     */
+    public static function canView(): bool
+    {
+        return auth()->user()?->hasAnyRole(['admin', 'officer', 'principal']) ?? false;
+    }
+
     protected function getStats(): array
     {
         $pending = PeriodResult::query()

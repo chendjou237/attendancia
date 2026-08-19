@@ -28,6 +28,24 @@ function overviewStats(): array
     return (fn () => $this->getStats())->call($overview);
 }
 
+it('is hidden from hr, whose numbers come from approved reports only', function () {
+    expect(AttendanceOverview::canView())->toBeTrue(); // still admin from beforeEach
+
+    $hr = User::factory()->create();
+    $hr->assignRole('hr');
+    $this->actingAs($hr);
+
+    expect(AttendanceOverview::canView())->toBeFalse();
+});
+
+it('is visible to admin, officer, and principal', function (string $role) {
+    $user = User::factory()->create();
+    $user->assignRole($role);
+    $this->actingAs($user);
+
+    expect(AttendanceOverview::canView())->toBeTrue();
+})->with(['admin', 'officer', 'principal']);
+
 it('counts pending exceptions and links to the exception queue', function () {
     $session = AttendanceSession::factory()->create(['state' => SessionState::Unpaired, 'anomaly_code' => SessionAnomaly::NoScanIn->value]);
     PeriodResult::factory()->create([
