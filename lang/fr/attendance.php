@@ -24,6 +24,13 @@ return [
         'unpaired' => 'Non apparié',
     ],
 
+    'session_anomalies' => [
+        'no_scan_in' => "Pas de pointage d'entrée",
+        'no_scan_out' => 'Pas de pointage de sortie',
+        'too_short' => 'Intervalle trop court',
+        'location_mismatch' => 'Pointage dans le mauvais couloir',
+    ],
+
     'sources' => [
         'scan' => 'Pointage',
         'administrative' => 'Administratif',

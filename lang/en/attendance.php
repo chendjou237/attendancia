@@ -24,6 +24,13 @@ return [
         'unpaired' => 'Unpaired',
     ],
 
+    'session_anomalies' => [
+        'no_scan_in' => 'No scan-in',
+        'no_scan_out' => 'No scan-out',
+        'too_short' => 'Interval too short',
+        'location_mismatch' => 'Scanned in the wrong corridor',
+    ],
+
     'sources' => [
         'scan' => 'Scan',
         'administrative' => 'Administrative',
