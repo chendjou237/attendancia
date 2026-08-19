@@ -3,8 +3,14 @@
 namespace App\Console\Commands;
 
 use App\Enums\DayType;
+use App\Enums\ReportState;
+use App\Models\AuditLog;
 use App\Models\CalendarDay;
+use App\Models\MonthlyReport;
+use App\Models\User;
 use App\Services\Demo\AttendanceSimulator;
+use App\Services\Reporting\MonthlyReportGenerator;
+use Carbon\Carbon;
 use Database\Seeders\DemoSeeder;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\Artisan;
@@ -14,18 +20,18 @@ use Illuminate\Support\Facades\Artisan;
  * device isn't available: reference data (corridors, rooms, teachers,
  * a real bell schedule, timetables) plus simulated attendance history
  * run through the actual ingestion pipeline, so the exception queue,
- * calendar behaviour, and reports all have real, engine-computed
- * content rather than fabricated numbers.
+ * calendar behaviour, dashboard, and monthly reports all have real,
+ * engine-computed content rather than fabricated numbers.
  */
 class DemoSeed extends Command
 {
     protected $signature = 'demo:seed
         {--fresh : wipe the database first}
-        {--days=15 : how many recent weekdays to simulate}';
+        {--months=2 : how many calendar months to simulate, counting the current (partial, up to today) month}';
 
     protected $description = 'Seed a realistic demo dataset for presentations without a live device.';
 
-    public function handle(AttendanceSimulator $simulator): int
+    public function handle(AttendanceSimulator $simulator, MonthlyReportGenerator $reportGenerator): int
     {
         if ($this->option('fresh')) {
             if (! $this->confirm('This will WIPE the current database and reseed it. Continue?', true)) {
@@ -39,7 +45,7 @@ class DemoSeed extends Command
         $seeder = new DemoSeeder;
         $seeder->run();
 
-        $dates = $this->recentWeekdays((int) $this->option('days'));
+        $dates = $this->calendarWeekdays((int) $this->option('months'));
         $featuredDates = $this->seedFeaturedCalendarDays($dates, $seeder->classCodes);
 
         $this->info('Simulating '.count($dates).' weekdays of attendance for '.count($seeder->teachers).' teachers...');
@@ -71,6 +77,10 @@ class DemoSeed extends Command
         }
 
         $this->newLine();
+        $this->info('Generating monthly reports...');
+        $this->generateMonthlyReports($dates, $reportGenerator);
+
+        $this->newLine();
         $this->info('Demo ready. Sign in at /admin with:');
         $this->table(['Role', 'Email', 'Password'], [
             ['Admin', 'admin@attendancia.test', 'password'],
@@ -83,22 +93,32 @@ class DemoSeed extends Command
     }
 
     /**
+     * Every weekday from the start of the month $months-1 months ago
+     * through today (inclusive) — anchored to real calendar months,
+     * not a rolling weekday count, so "2 months" always means one
+     * genuinely complete past month plus the current one in progress.
+     * Including today (unlike a live device, which wouldn't have
+     * today's later scans yet) is deliberate: this is demo data for a
+     * presentation, and a presenter wants today's numbers on the
+     * dashboard immediately after seeding, not a blank "today."
+     *
      * @return array<int, \Carbon\CarbonInterface>
      */
-    private function recentWeekdays(int $count): array
+    private function calendarWeekdays(int $months): array
     {
-        $dates = [];
-        $cursor = now()->subDay(); // start from yesterday — today may still be "in progress"
+        $end = now()->startOfDay();
+        $cursor = $end->clone()->subMonthsNoOverflow(max(1, $months) - 1)->startOfMonth();
 
-        while (count($dates) < $count) {
+        $dates = [];
+        while ($cursor->lte($end)) {
             if ($cursor->isWeekday()) {
                 $dates[] = $cursor->clone();
             }
 
-            $cursor->subDay();
+            $cursor->addDay();
         }
 
-        return array_reverse($dates);
+        return $dates;
     }
 
     /**
@@ -136,5 +156,61 @@ class DemoSeed extends Command
         }
 
         return $marked;
+    }
+
+    /**
+     * A report per calendar month touched by the simulated range.
+     * Every month strictly before the current one is walked all the
+     * way to SentToHr — a finished example to look at — since its
+     * data is complete and won't change. The current, still-in-
+     * progress month is left as a fresh Draft so a live demo can walk
+     * the approval workflow itself rather than finding it already done.
+     */
+    private function generateMonthlyReports(array $dates, MonthlyReportGenerator $reportGenerator): void
+    {
+        $currentMonthStart = now()->startOfMonth();
+        $officer = User::where('email', 'officer@attendancia.test')->first();
+        $principal = User::where('email', 'principal@attendancia.test')->first();
+
+        $months = collect($dates)
+            ->map(fn (Carbon $d) => $d->copy()->startOfMonth()->toDateString())
+            ->unique()
+            ->sort();
+
+        foreach ($months as $monthString) {
+            $month = Carbon::parse($monthString);
+            $report = $reportGenerator->generate($month);
+
+            if ($month->lt($currentMonthStart)) {
+                $this->driveToSentToHr($report, $officer, $principal);
+            }
+        }
+    }
+
+    private function driveToSentToHr(MonthlyReport $report, ?User $officer, ?User $principal): void
+    {
+        $this->transition($report, ReportState::OfficerReviewed, 'officer_reviewed', $officer);
+
+        $report->update(['approved_by' => $principal?->id, 'approved_at' => now()->subDays(2)]);
+        $this->transition($report, ReportState::PrincipalApproved, 'principal_approved', $principal);
+
+        $report->update(['sent_to_hr_at' => now()->subDay()]);
+        $this->transition($report, ReportState::SentToHr, 'sent_to_hr', $officer);
+    }
+
+    private function transition(MonthlyReport $report, ReportState $to, string $action, ?User $actor): void
+    {
+        $before = $report->only(['state']);
+        $report->update(['state' => $to]);
+
+        AuditLog::create([
+            'entity' => 'monthly_reports',
+            'entity_id' => $report->id,
+            'action' => $action,
+            'actor_id' => $actor?->id,
+            'before_json' => $before,
+            'after_json' => $report->only(['state']),
+            'at' => now(),
+        ]);
     }
 }

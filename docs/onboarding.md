@@ -188,11 +188,22 @@ hours either lost power or lost network, and every scan during that window
 is queued on the device itself, not lost, but the sooner it's noticed the
 sooner it's fixed.
 
+**Monthly Reports** — your part of month-end close. Use **Generate report**
+(pick the month) once the month is done and the exception queue for it is
+clear or close to it. Open the generated report and check the per-teacher
+breakdown and the pending-exceptions warning at the top — if there's still a
+meaningful number pending, go clear those in the Exception queue first and
+use **Regenerate from latest data** rather than proceeding with stale
+numbers. Once it looks right, **Mark reviewed** — that's your sign-off before
+it goes to the Principal for approval (§3). You can regenerate as many times
+as needed up to that point; nothing is final until the Principal approves it.
+
 ---
 
 ## 3. Principal
 
-Your view into the system today is mainly oversight, through two screens:
+You're the approval gate between the Officer's day-to-day work and HR's
+payroll numbers. Your two recurring screens:
 
 - **Exception queue** — see what the Officer is resolving and how (read
   along, or override something yourself if you disagree with a call already
@@ -201,31 +212,48 @@ Your view into the system today is mainly oversight, through two screens:
   the reason given. This is your record for "why does this teacher's month
   look like this."
 
-**Be aware**: automated monthly reports (draft → officer-reviewed →
-principal-approved → sent to HR) are planned but **not built yet** — that's
-the next phase of this project, expected before the first payroll run needs
-it. Until then, a monthly total has to be pulled by whoever manages the
-server, directly from the computed period results. If you need a number
-before the reporting screens exist, ask them.
+**Monthly Reports** is where your actual approval happens. Each month
+(once the Officer has generated and reviewed it — see §2 and §4 below) shows
+up here in **Officer reviewed** state with a **Principal approve** button.
+Open the report first — it shows the full per-teacher breakdown (present,
+absent, hours) and, prominently, whether any period that month is still
+`Unpaired` or `Location mismatch` and therefore not yet counted either way.
+**Check that warning before approving** — approving with pending exceptions
+still open means those teachers' numbers are undercounted, not wrong, but
+undercounted, and this is your last checkpoint before it's frozen.
+
+Approving is deliberately one-way: once you approve, the report can no
+longer be regenerated from newer data, even if something changes later.
+That's intentional — it's what makes "the September report" mean the same
+thing in six months that it means today. A correction after approval needs
+a manual, audited adjustment, not a re-run.
 
 ---
 
 ## 4. HR
 
-Honestly, right now: **there isn't a dedicated HR screen yet.** The
-monthly-report workflow described in the original project scope (a report
-that moves from draft through officer review and principal approval before
-being frozen and sent to you) is built at the database level but the
-screens and the generation logic haven't been written — that's explicitly
-the next phase of work, timed to land before the first payroll cycle that
-needs it.
+**Monthly Reports** is your screen. A report reaches you already in **Sent
+to HR** state — by the time you see it, an Officer has generated and
+reviewed it and a Principal has approved it, and it's frozen: the numbers
+you're looking at will never silently change under you.
 
-Until it exists, the numbers you need for hourly-paid staff's hours can be
-pulled directly by whoever manages the server — ask them for a specific
-teacher or date range. Every period result is stamped with which rule
-version computed it and when, so a number pulled today and the same number
-re-pulled later will always match unless a human explicitly overrode it (and
-if one did, the audit log has the reason).
+Open a report to see:
+
+- **Payable hours** — the total for hourly-paid staff, which is what
+  actually drives their pay this month.
+- **Oversight hours** — the same measurement for salaried staff, tracked for
+  visibility, not pay.
+- A per-teacher table underneath: present, present (administrative), absent,
+  absent (justified), and hours, per person — matching the paper timetable
+  shape rather than a flat export.
+- A basis note at the bottom of the page spelling out exactly how hours were
+  computed (currently 1 period = 1 hour) — printed on the report itself so
+  nobody has to guess or ask later.
+
+If a report you need isn't in **Sent to HR** state yet, it's still moving
+through the Officer/Principal steps above — ask them rather than the
+database; there's deliberately no way to pull an unfinished month's numbers
+from this screen, since an in-progress report can still change.
 
 ---
 
@@ -242,8 +270,12 @@ php artisan demo:seed --fresh
 ```
 
 This wipes and reseeds the database with 8 teachers, a full bell schedule,
-and about three weeks of simulated attendance (some clean, some with genuine
-exceptions to look at). It also creates one login per role:
+and about two calendar months of simulated attendance (some clean, some with
+genuine exceptions to look at) — the most recently completed month is walked
+all the way through to a finished, **Sent to HR** monthly report as a
+worked example, and the current, still-in-progress month is left as a fresh
+**Draft** so you can demo the Officer → Principal approval workflow live
+(§2–§4 above). It also creates one login per role:
 
 | Role | Email | Password |
 |---|---|---|
