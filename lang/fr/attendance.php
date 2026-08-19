@@ -42,4 +42,17 @@ return [
         'salaried' => 'Salarié',
     ],
 
+    'timetable_states' => [
+        'draft' => 'Brouillon',
+        'submitted' => 'Soumis',
+        'approved' => 'Approuvé',
+    ],
+
+    'report_states' => [
+        'draft' => 'Brouillon',
+        'officer_reviewed' => "Vérifié par l'agent",
+        'principal_approved' => 'Approuvé par le proviseur',
+        'sent_to_hr' => 'Envoyé aux RH',
+    ],
+
 ];

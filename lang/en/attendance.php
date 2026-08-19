@@ -42,4 +42,17 @@ return [
         'salaried' => 'Salaried',
     ],
 
+    'timetable_states' => [
+        'draft' => 'Draft',
+        'submitted' => 'Submitted',
+        'approved' => 'Approved',
+    ],
+
+    'report_states' => [
+        'draft' => 'Draft',
+        'officer_reviewed' => 'Officer reviewed',
+        'principal_approved' => 'Principal approved',
+        'sent_to_hr' => 'Sent to HR',
+    ],
+
 ];
