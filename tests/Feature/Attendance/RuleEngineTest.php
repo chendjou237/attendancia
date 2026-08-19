@@ -64,12 +64,15 @@ it('never evaluates an unpaired session against the covering rule — every slot
 });
 
 it('writes LOCATION_MISMATCH status when that is the session anomaly', function () {
+    config(['attendance.enforce_location' => true]); // §7.4: off by default in the pilot
     $f = AttendanceFixture::make();
     $f->scanAt('07:28:00', device: $f->wrongDevice);
 
     $results = computeSession($f);
 
     expect($results->first()->status)->toBe(PeriodStatus::LocationMismatch);
+
+    config(['attendance.enforce_location' => false]);
 });
 
 it('is idempotent under the same rule_version: recomputing reuses the same row', function () {

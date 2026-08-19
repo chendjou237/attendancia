@@ -16,6 +16,14 @@ function pairedSession(AttendanceFixture $f): \App\Models\AttendanceSession
     return $session->fresh(['firstSlot', 'lastSlot']);
 }
 
+// config() mutations aren't reset between tests in this file by
+// RefreshDatabase, which only resets the database — without this, a
+// test that sets enforce_location leaks it into whichever test runs
+// next.
+afterEach(function () {
+    config(['attendance.enforce_location' => false]);
+});
+
 it('pairs a normal scan-in and scan-out', function () {
     $f = AttendanceFixture::make();
     $session = pairedSession($f);
@@ -85,8 +93,10 @@ it('marks too_short for two genuinely distinct scans that are not a double-tap',
 
 // §11.1: a cover teacher's scan lands in a corridor they have no
 // scheduled lesson in — this must surface as a distinct anomaly, not a
-// plain "didn't scan".
-it('marks location_mismatch when the only scan is at the wrong corridor', function () {
+// plain "didn't scan". Only reachable with enforce_location on — see
+// the §7.4 tests further down for why that's not the pilot default.
+it('marks location_mismatch when the only scan is at the wrong corridor and enforce_location is on', function () {
+    config(['attendance.enforce_location' => true]);
     $f = AttendanceFixture::make();
     $session = pairedSession($f);
     $f->scanAt('07:28:00', device: $f->wrongDevice);
@@ -133,4 +143,19 @@ it('lets one boundary scan serve as scan-out of one session and scan-in of the n
     expect($sessionB->state)->toBe(SessionState::Paired);
     expect($sessionA->scan_out_event_id)->toBe($boundary->id);
     expect($sessionB->scan_in_event_id)->toBe($boundary->id);
+});
+
+// §7.4: off by default for the single-device pilot.
+it('pairs successfully across corridors when enforce_location is off (the default)', function () {
+    config(['attendance.enforce_location' => false]);
+    $f = AttendanceFixture::make();
+    $session = pairedSession($f);
+    $f->scanAt('07:28:00', device: $f->wrongDevice);
+    $f->scanAt('08:20:00', device: $f->wrongDevice);
+
+    (new PairingEngine)->pair($session, $f->rule);
+    $session->refresh();
+
+    expect($session->state)->toBe(SessionState::Paired);
+    expect($session->anomaly_code)->toBeNull();
 });

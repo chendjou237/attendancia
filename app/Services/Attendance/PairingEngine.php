@@ -9,6 +9,7 @@ use App\Models\RawEvent;
 use App\Models\RuleVersion;
 use Carbon\Carbon;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\Log;
 
 /**
  * §8.3: pairs raw_events to a session's scan-in / scan-out.
@@ -17,7 +18,7 @@ use Illuminate\Support\Collection;
  *             through session_end
  *   scan-out: latest event from scan-in through session_end + pair_window_after
  *
- * Plus three decisions layered on top of the plain rule:
+ * Plus four decisions layered on top of the plain rule:
  *   - debounce: successive scans from the same teacher inside
  *     min_scan_gap_seconds collapse to one before pairing (finding 1.4 —
  *     stops a double-tap from being read as a real scan-in/scan-out pair)
@@ -25,6 +26,13 @@ use Illuminate\Support\Collection;
  *     the scan-in of the next; nothing here marks an event "consumed"
  *   - a paired interval shorter than min_session_minutes is UNPAIRED, not
  *     a valid (if suspiciously brief) attendance
+ *   - §7.4: corridor matching is only enforced when
+ *     config('attendance.enforce_location') is on (production, once
+ *     every corridor has its own terminal). Off by default for the
+ *     single-device pilot — see the config file for why — but a
+ *     cross-corridor match is still logged so the gap between "how
+ *     often this would fire" and "how often it should fire" can be
+ *     seen before flipping the flag.
  */
 class PairingEngine
 {
@@ -32,6 +40,7 @@ class PairingEngine
     {
         $tz = config('attendance.timezone');
         $date = $session->date->toDateString();
+        $enforceLocation = (bool) config('attendance.enforce_location');
 
         $sessionStart = Carbon::parse($date.' '.$session->firstSlot->start_time, $tz)->utc();
         $sessionEnd = Carbon::parse($date.' '.$session->lastSlot->end_time, $tz)->utc();
@@ -49,11 +58,11 @@ class PairingEngine
             $rule->min_scan_gap_seconds,
         );
 
-        $inCorridor = $allEvents->filter(
-            fn (RawEvent $e) => $e->device?->corridor_id === $session->corridor_id
-        )->values();
+        $candidates = $enforceLocation
+            ? $allEvents->filter(fn (RawEvent $e) => $e->device?->corridor_id === $session->corridor_id)->values()
+            : $allEvents;
 
-        $scanIn = $inCorridor->first(
+        $scanIn = $candidates->first(
             fn (RawEvent $e) => $e->event_time_server->betweenIncluded($windowStart, $sessionEnd)
         );
 
@@ -61,6 +70,9 @@ class PairingEngine
             $session->scan_in_event_id = null;
             $session->scan_out_event_id = null;
             $session->state = SessionState::Unpaired;
+            // Only reachable when enforcing (otherwise $candidates already
+            // is $allEvents, so finding nothing here means there was
+            // nothing to find anywhere).
             $session->anomaly_code = $allEvents->isNotEmpty()
                 ? SessionAnomaly::LocationMismatch->value
                 : SessionAnomaly::NoScanIn->value;
@@ -69,11 +81,21 @@ class PairingEngine
             return;
         }
 
+        if (! $enforceLocation && $scanIn->device?->corridor_id !== $session->corridor_id) {
+            Log::channel('attendance')->info('Cross-corridor match while enforce_location is off', [
+                'session_id' => $session->id,
+                'teacher_id' => $session->teacher_id,
+                'expected_corridor_id' => $session->corridor_id,
+                'actual_corridor_id' => $scanIn->device?->corridor_id,
+                'raw_event_id' => $scanIn->id,
+            ]);
+        }
+
         // Excludes scan-in's own row: a single tap is not a pair with
         // itself, and without this a lone scan-in self-selects as its own
         // scan-out (0-minute "session") instead of correctly reporting
         // that no scan-out ever arrived.
-        $scanOut = $inCorridor
+        $scanOut = $candidates
             ->filter(fn (RawEvent $e) => $e->id !== $scanIn->id
                 && $e->event_time_server->betweenIncluded($scanIn->event_time_server, $windowEnd))
             ->last();

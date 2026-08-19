@@ -73,6 +73,16 @@ return [
             'replace_placeholders' => true,
         ],
 
+        // §5: failed/unenrolled scans and other attendance-domain noise
+        // get their own channel so they don't drown the main log.
+        'attendance' => [
+            'driver' => 'daily',
+            'path' => storage_path('logs/attendance.log'),
+            'level' => env('LOG_LEVEL', 'debug'),
+            'max_files' => 14,
+            'replace_placeholders' => true,
+        ],
+
         'monthly' => [
             'driver' => 'monthly',
             'path' => storage_path('logs/laravel.log'),
