@@ -45,4 +45,9 @@ class NoticeResource extends Resource
             'edit' => EditNotice::route('/{record}/edit'),
         ];
     }
+
+    public static function canViewAny(): bool
+    {
+        return auth()->user()?->hasRole('admin') ?? false;
+    }
 }

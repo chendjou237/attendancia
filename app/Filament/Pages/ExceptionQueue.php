@@ -38,6 +38,15 @@ class ExceptionQueue extends Page implements HasTable
 
     protected string $view = 'filament.pages.exception-queue';
 
+    /**
+     * Onboarding §2/§3: Officer resolves the queue day to day, Principal
+     * reads along and can override; HR has no reason to be here.
+     */
+    public static function canAccess(): bool
+    {
+        return auth()->user()?->hasAnyRole(['admin', 'officer', 'principal']) ?? false;
+    }
+
     public function content(Schema $schema): Schema
     {
         return $schema->components([

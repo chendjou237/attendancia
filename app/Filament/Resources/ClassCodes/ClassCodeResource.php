@@ -47,4 +47,9 @@ class ClassCodeResource extends Resource
             'edit' => EditClassCode::route('/{record}/edit'),
         ];
     }
+
+    public static function canViewAny(): bool
+    {
+        return auth()->user()?->hasRole('admin') ?? false;
+    }
 }

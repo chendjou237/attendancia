@@ -14,7 +14,15 @@ use Filament\Resources\Resource;
 use Filament\Schemas\Schema;
 use Filament\Support\Icons\Heroicon;
 use Filament\Tables\Table;
+use Illuminate\Auth\Access\Response;
+use Illuminate\Database\Eloquent\Model;
 
+/**
+ * Onboarding §1/§2: Admin owns the Teacher record itself (add, edit,
+ * deactivate); Officer only reaches a teacher to use Manage Timetable,
+ * so viewAny is shared but mutation of the teacher's own fields stays
+ * admin-only.
+ */
 class TeacherResource extends Resource
 {
     protected static ?string $model = Teacher::class;
@@ -48,5 +56,42 @@ class TeacherResource extends Resource
             'edit' => EditTeacher::route('/{record}/edit'),
             'timetable' => ManageTimetable::route('/{record}/timetable'),
         ];
+    }
+
+    public static function canViewAny(): bool
+    {
+        return auth()->user()?->hasAnyRole(['admin', 'officer']) ?? false;
+    }
+
+    /**
+     * Overriding the Response-returning methods (rather than the plain
+     * canCreate()/canEdit()/canDelete() booleans) matters here: Filament's
+     * standard action buttons (CreateAction/EditAction/DeleteBulkAction)
+     * resolve their visibility through these Get*AuthorizationResponse
+     * methods, not through the boolean can*() helpers.
+     */
+    public static function getCreateAuthorizationResponse(): Response
+    {
+        return static::isAdmin() ? Response::allow() : Response::deny();
+    }
+
+    public static function getEditAuthorizationResponse(Model $record): Response
+    {
+        return static::isAdmin() ? Response::allow() : Response::deny();
+    }
+
+    public static function getDeleteAuthorizationResponse(Model $record): Response
+    {
+        return static::isAdmin() ? Response::allow() : Response::deny();
+    }
+
+    public static function getDeleteAnyAuthorizationResponse(): Response
+    {
+        return static::isAdmin() ? Response::allow() : Response::deny();
+    }
+
+    private static function isAdmin(): bool
+    {
+        return auth()->user()?->hasRole('admin') ?? false;
     }
 }

@@ -45,4 +45,9 @@ class CalendarDayResource extends Resource
             'edit' => EditCalendarDay::route('/{record}/edit'),
         ];
     }
+
+    public static function canViewAny(): bool
+    {
+        return auth()->user()?->hasRole('admin') ?? false;
+    }
 }
