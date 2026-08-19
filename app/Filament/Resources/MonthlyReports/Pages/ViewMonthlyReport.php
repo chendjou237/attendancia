@@ -42,6 +42,14 @@ class ViewMonthlyReport extends Page
         $state = $this->record->state;
 
         return [
+            Action::make('downloadPdf')
+                ->label('Download PDF')
+                ->icon(Heroicon::OutlinedArrowDownTray)
+                ->color('gray')
+                ->visible($this->record->snapshot_json !== null)
+                ->url(fn () => route('monthly-reports.pdf', ['report' => $this->record]))
+                ->openUrlInNewTab(),
+
             Action::make('regenerate')
                 ->label('Regenerate from latest data')
                 ->icon(Heroicon::OutlinedArrowPath)

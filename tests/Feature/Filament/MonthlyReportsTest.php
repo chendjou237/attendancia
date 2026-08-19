@@ -108,6 +108,18 @@ it('does not offer regenerate once a report is principal-approved or later', fun
         ->assertActionVisible('sendToHr');
 });
 
+it('offers the download-pdf action once a report has been generated, hides it otherwise', function () {
+    actingAsRole('admin');
+    $generated = MonthlyReport::factory()->create(['month' => now()->startOfMonth(), 'state' => ReportState::Draft, 'snapshot_json' => emptySnapshot()]);
+    $ungenerated = MonthlyReport::factory()->create(['month' => now()->startOfMonth()->subMonthNoOverflow(), 'state' => ReportState::Draft, 'snapshot_json' => null]);
+
+    Livewire::test(ViewMonthlyReport::class, ['record' => $generated->getRouteKey()])
+        ->assertActionVisible('downloadPdf');
+
+    Livewire::test(ViewMonthlyReport::class, ['record' => $ungenerated->getRouteKey()])
+        ->assertActionHidden('downloadPdf');
+});
+
 it('regenerating a draft report through the page refreshes its snapshot', function () {
     actingAsRole('admin');
     $teacher = Teacher::factory()->create();
