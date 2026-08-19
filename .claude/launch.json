@@ -1,0 +1,11 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "attendancia",
+      "runtimeExecutable": "/Users/saint/Library/Application Support/Herd/bin/php84",
+      "runtimeArgs": ["artisan", "serve", "--port=8123"],
+      "port": 8123
+    }
+  ]
+}
