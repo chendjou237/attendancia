@@ -86,6 +86,7 @@
                                 <th style="padding:0.5rem;text-align:right">Absent (justified)</th>
                                 <th style="padding:0.5rem;text-align:right">Pending</th>
                                 <th style="padding:0.5rem;text-align:right">Hours</th>
+                                <th style="padding:0.5rem"></th>
                             </tr>
                         </thead>
                         <tbody>
@@ -100,10 +101,19 @@
                                     <td style="padding:0.5rem;text-align:right">{{ $row['absent_justified'] }}</td>
                                     <td style="padding:0.5rem;text-align:right;{{ $row['pending'] > 0 ? 'color:rgb(248 113 113)' : '' }}">{{ $row['pending'] }}</td>
                                     <td style="padding:0.5rem;text-align:right;font-weight:600">{{ $row['hours_taught'] }}</td>
+                                    <td style="padding:0.5rem;text-align:right">
+                                        <a
+                                            href="{{ route('monthly-reports.teacher-pdf', ['report' => $this->record, 'teacherId' => $row['teacher_id']]) }}"
+                                            target="_blank"
+                                            style="color:rgb(251 146 60);text-decoration:none;font-size:0.8125rem;white-space:nowrap"
+                                        >
+                                            Download PDF
+                                        </a>
+                                    </td>
                                 </tr>
                             @empty
                                 <tr>
-                                    <td colspan="9" style="padding:1rem;text-align:center;color:rgb(156 163 175)">
+                                    <td colspan="10" style="padding:1rem;text-align:center;color:rgb(156 163 175)">
                                         No period results for this month.
                                     </td>
                                 </tr>
