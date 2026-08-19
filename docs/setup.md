@@ -234,39 +234,25 @@ work through:
 5. **Calendar** — public holidays and known school closures for the term, at
    minimum. Half-days and class-scoped suspensions (e.g. one form sitting a
    sequence exam) can be added as they come up.
-6. **Rule version** — the grace windows, pairing windows, debounce, and
+6. **Bell schedule** — the **Period Slots** screen: each teaching/break
+   period's day, sequence, and start/end time. This is the single most
+   important reference table in the system — every session boundary and every
+   grace window is computed from it — so get the official grid from the
+   school before entering it, rather than guessing. Repeat for every period
+   and break, every teaching day. Like the rule version below, it's versioned
+   by `valid_from`/`valid_to`, so a mid-year bell-schedule change never
+   rewrites how a past date was resolved; the list defaults to showing only
+   the version active today (remove the "Current version only" filter to see
+   past or future versions).
+7. **Rule version** — the grace windows, pairing windows, debounce, and
    minimum-session values (§5 of the project scope has the current defaults:
    10 min late grace, 15 min early grace, 15 min pairing windows either side,
    30s debounce, 10 min minimum session, 1.00 hours per period). Every value
    here is versioned by `valid_from`, so a later correction never rewrites
    an already-computed month.
-7. **Teachers and timetables** — see §11 below; for anything beyond a
+8. **Teachers and timetables** — see §11 below; for anything beyond a
    handful of teachers, use the bulk-import commands rather than the admin
    forms.
-
-**One gap to know about now**: the bell schedule (`period_slots` — each
-teaching/break period's day, sequence, and start/end time) has **no admin
-screen yet**. It must be entered directly, either by writing a short one-off
-seeder (see `database/seeders/DemoSeeder.php`'s `seedPeriodSlots()` method for
-the shape to copy) or via `php artisan tinker`:
-
-```bash
-php artisan tinker
->>> \App\Models\PeriodSlot::create([
-...     'day_of_week' => 1, // 0 = Sunday .. 6 = Saturday
-...     'seq' => 1,
-...     'start_time' => '07:30:00',
-...     'end_time' => '08:25:00',
-...     'is_break' => false,
-...     'valid_from' => '2026-09-01',
-... ]);
-```
-
-Repeat for every period and break, every teaching day, per the school's
-official timetable. This is the single most important reference table in the
-system — every session boundary and every grace window is computed from it —
-so get the official grid from the school before doing this, rather than
-guessing.
 
 ---
 
