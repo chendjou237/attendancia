@@ -272,9 +272,10 @@ guessing.
 
 ## 9. Create user accounts
 
-There's also no admin screen yet for creating logins — the four roles
-(`admin`, `officer`, `principal`, `hr`) exist, but assigning them to a person
-is a `tinker` operation:
+Logins are created from the admin panel's **Users** screen (name, email,
+password, and one of the four roles — `admin`, `officer`, `principal`,
+`hr`) — but that screen only exists once a first `admin` account exists to
+sign in as, so bootstrap that one account from the command line:
 
 ```bash
 php artisan tinker
@@ -283,20 +284,18 @@ php artisan tinker
 ...     'email' => 'person@school.example',
 ...     'password' => bcrypt('a-real-password'),
 ... ]);
->>> $user->assignRole('officer'); // or admin / principal / hr
+>>> $user->assignRole('admin');
 ```
 
-Create at least one `admin` account this way before handing the machine over
-— that account can then use the admin panel for everything in §8 going
-forward, no further `tinker` needed for reference data.
+From there, sign in as that admin and create every other login (officer,
+principal, hr, and any additional admins) from **Users** in the panel — no
+further `tinker` needed.
 
-**Know before you assign roles**: the admin panel does not yet restrict which
-resources each role can see — anyone who can log in currently sees every
-Filament resource, regardless of role. The roles exist and are correctly
-assigned, but menu-level restriction by role is not enforced today. Treat
-account creation as the actual access boundary for now: only create logins
-for people who should be able to see and edit everything in the system, and
-brief them on which parts are "theirs" per the [onboarding guide](onboarding.md).
+**Role boundaries are enforced**: each role only sees the Filament resources
+relevant to it (Officer: Exception Queue, Manage Timetable, Teacher
+Biometric IDs; Principal: Exception Queue, Audit Log; HR: nothing dedicated
+yet; Admin: everything, including Users). See the [onboarding
+guide](onboarding.md) for what each role is actually responsible for.
 
 ---
 

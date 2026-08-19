@@ -47,4 +47,9 @@ class DeviceResource extends Resource
             'edit' => EditDevice::route('/{record}/edit'),
         ];
     }
+
+    public static function canViewAny(): bool
+    {
+        return auth()->user()?->hasRole('admin') ?? false;
+    }
 }

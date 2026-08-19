@@ -47,4 +47,9 @@ class RoomResource extends Resource
             'edit' => EditRoom::route('/{record}/edit'),
         ];
     }
+
+    public static function canViewAny(): bool
+    {
+        return auth()->user()?->hasRole('admin') ?? false;
+    }
 }

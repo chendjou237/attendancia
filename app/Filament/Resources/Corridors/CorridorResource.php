@@ -47,4 +47,9 @@ class CorridorResource extends Resource
             'edit' => EditCorridor::route('/{record}/edit'),
         ];
     }
+
+    public static function canViewAny(): bool
+    {
+        return auth()->user()?->hasRole('admin') ?? false;
+    }
 }

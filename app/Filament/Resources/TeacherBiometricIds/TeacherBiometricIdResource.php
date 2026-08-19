@@ -45,4 +45,9 @@ class TeacherBiometricIdResource extends Resource
             'edit' => EditTeacherBiometricId::route('/{record}/edit'),
         ];
     }
+
+    public static function canViewAny(): bool
+    {
+        return auth()->user()?->hasAnyRole(['admin', 'officer']) ?? false;
+    }
 }

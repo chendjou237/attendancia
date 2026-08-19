@@ -22,12 +22,9 @@ Go to `http://<server-address>/admin` and sign in with the account your
 admin created for you (see [docs/setup.md](setup.md) §9 if you're the one
 setting up the first accounts).
 
-**One thing to know now**: the admin panel doesn't yet restrict which screens
-each role can see — logging in shows you the full menu regardless of your
-role. The sections below describe what your role is actually *responsible*
-for, not what's technically hidden from you. Please stick to your own lane
-even though the door isn't locked — this is a known gap, not a design
-decision.
+**One thing to know now**: the admin panel's menu only shows the screens
+relevant to your role — the sections below describe what each role actually
+sees and is responsible for.
 
 ## Status glossary
 
@@ -141,12 +138,14 @@ that teacher/date, not just the rows that changed.
 **Not yet self-service, still needs the command line:**
 
 - The **bell schedule** (period start/end times) has no admin screen yet.
-- **Creating logins** for other staff also has no admin screen yet.
 
-Both are documented with copy-pasteable commands in
-[docs/setup.md](setup.md) §8–9. If you're doing either of these often, it's
-worth asking for a proper screen to be built — but for now, one-time setup
-per term is the expected frequency.
+This is documented with copy-pasteable commands in [docs/setup.md](setup.md)
+§8. If you're doing this often, it's worth asking for a proper screen to be
+built — but for now, one-time setup per term is the expected frequency.
+
+**Creating logins** for other staff has its own screen now — **Users**, in
+the admin panel (name, email, password, and one of the four roles). See
+[docs/setup.md](setup.md) §9.
 
 ---
 
