@@ -12,6 +12,8 @@ class RuleVersionFactory extends Factory
 {
     protected $model = RuleVersion::class;
 
+    private static int $sequence = 0;
+
     public function definition(): array
     {
         return [
@@ -24,8 +26,15 @@ class RuleVersionFactory extends Factory
             'min_session_minutes' => 10,
             'hours_per_period' => 1.00,
             // Unique by default (valid_from is a unique column) so
-            // unrelated factory calls in the same test don't collide.
-            'valid_from' => fake()->unique()->dateTimeBetween('-3 years', '-2 years')->format('Y-m-d'),
+            // unrelated factory calls don't collide. A monotonic
+            // sequence rather than fake()->unique() — the latter
+            // resets per test (fresh Faker instance from Laravel's
+            // per-test refreshApplication()) and can pick the same
+            // random date across two different tests, which is a
+            // real collision once the DB row from the first isn't
+            // rolled back yet (nested/afterEach ordering) or the
+            // two tests share a transaction.
+            'valid_from' => now()->subYears(3)->addDays(self::$sequence++)->format('Y-m-d'),
             'created_by' => null,
             'note' => null,
         ];
