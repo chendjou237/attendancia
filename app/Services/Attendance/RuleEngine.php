@@ -37,11 +37,21 @@ class RuleEngine
     ) {}
 
     /**
+     * $maxSeq (§13.2 half-day cutoff): when given, slots beyond it are
+     * simply not written at all — not even as UNPAIRED — because they
+     * were never expected in the first place. Pairing still runs against
+     * the session's full natural boundaries; only which slots receive a
+     * period_result is restricted.
+     *
      * @return Collection<int, \App\Models\PeriodResult>
      */
-    public function computeForSession(AttendanceSession $session, RuleVersion $rule): Collection
+    public function computeForSession(AttendanceSession $session, RuleVersion $rule, ?int $maxSeq = null): Collection
     {
         $slots = $this->sessionBuilder->periodSlotsFor($session);
+
+        if ($maxSeq !== null) {
+            $slots = $slots->filter(fn (PeriodSlot $slot) => $slot->seq <= $maxSeq)->values();
+        }
 
         if ($session->state === SessionState::Unpaired) {
             $status = $session->anomaly_code === SessionAnomaly::LocationMismatch->value
