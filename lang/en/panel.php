@@ -114,6 +114,8 @@ return [
             'is_break_short' => 'Break',
             'open_ended' => 'Open-ended',
             'current_only' => 'Current version only',
+            'valid_from_help' => 'Applies to this date onward. Existing computed results before this date are never rewritten.',
+            'valid_to_help' => 'Leave empty if this is the current, open-ended version.',
         ],
 
         'notices' => [
@@ -186,6 +188,13 @@ return [
             'active_from' => 'Active from',
             'active_to' => 'Active to',
             'timetable_action' => 'Timetable',
+            'version' => 'Version',
+            'no_versions' => 'No versions yet',
+            'new_version_valid_from' => 'New version valid from',
+            'new_version_button' => 'New version',
+            'copy_current' => 'copy current',
+            'save_timetable' => 'Save timetable',
+            'no_timetable_version' => 'No timetable version exists yet for this teacher. Create one above.',
         ],
 
         'users' => [
@@ -214,6 +223,15 @@ return [
             'approve_modal_description' => 'This freezes the report. Once approved, it can no longer be regenerated — a correction after this point needs a manual, audited adjustment, not a re-run of the generator.',
             'send_to_hr_action' => 'Send to HR',
             'notification_state_updated' => 'Report state updated',
+            'not_generated_heading' => 'Not generated yet',
+            'not_generated_description' => 'This report has no data yet. Go back to the list and use "Generate report" for this month.',
+            'generated_prefix' => 'Generated',
+            'pending_heading' => ':count period(s) still pending',
+            'pending_description' => 'Unpaired or location-mismatch results included below are not counted as present or absent until the Exception Queue resolves them. Resolve those first, or approve knowing this report undercounts affected teachers.',
+            'type' => 'Type',
+            'pending' => 'Pending',
+            'hours' => 'Hours',
+            'no_period_results' => 'No period results for this month.',
         ],
 
     ],

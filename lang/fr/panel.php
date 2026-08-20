@@ -83,6 +83,8 @@ return [
             'is_break_short' => 'Pause',
             'open_ended' => 'Sans fin définie',
             'current_only' => 'Version actuelle uniquement',
+            'valid_from_help' => "S'applique à partir de cette date. Les résultats déjà calculés avant cette date ne sont jamais réécrits.",
+            'valid_to_help' => "Laisser vide s'il s'agit de la version actuelle, sans fin définie.",
         ],
 
         'notices' => [
@@ -155,6 +157,13 @@ return [
             'active_from' => 'Actif à partir du',
             'active_to' => "Actif jusqu'au",
             'timetable_action' => 'Emploi du temps',
+            'version' => 'Version',
+            'no_versions' => 'Aucune version pour le moment',
+            'new_version_valid_from' => 'Nouvelle version valide à partir du',
+            'new_version_button' => 'Nouvelle version',
+            'copy_current' => 'copier la version actuelle',
+            'save_timetable' => "Enregistrer l'emploi du temps",
+            'no_timetable_version' => "Aucun emploi du temps n'existe encore pour cet enseignant. Créez-en un ci-dessus.",
         ],
 
         'users' => [
@@ -183,6 +192,15 @@ return [
             'approve_modal_description' => "Ceci fige le rapport. Une fois approuvé, il ne peut plus être régénéré — une correction après ce point nécessite un ajustement manuel et audité, pas une nouvelle exécution du générateur.",
             'send_to_hr_action' => 'Envoyer aux RH',
             'notification_state_updated' => 'Statut du rapport mis à jour',
+            'not_generated_heading' => 'Pas encore généré',
+            'not_generated_description' => "Ce rapport n'a pas encore de données. Retournez à la liste et utilisez « Générer le rapport » pour ce mois.",
+            'generated_prefix' => 'Généré',
+            'pending_heading' => ':count période(s) encore en attente',
+            'pending_description' => "Les résultats non appariés ou en lieu incohérent inclus ci-dessous ne sont comptés ni présents ni absents tant que la file d'exceptions ne les résout pas. Résolvez-les d'abord, ou approuvez en sachant que ce rapport sous-compte les enseignants concernés.",
+            'type' => 'Type',
+            'pending' => 'En attente',
+            'hours' => 'Heures',
+            'no_period_results' => 'Aucun résultat de période pour ce mois.',
         ],
 
     ],

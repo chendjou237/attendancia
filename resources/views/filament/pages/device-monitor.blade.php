@@ -32,9 +32,9 @@
             @forelse ($this->devices as $device)
                 @php
                     $colors = [
-                        'online' => ['dot' => '#22c55e', 'text' => '#22c55e', 'label' => 'Online'],
-                        'warning' => ['dot' => '#f59e0b', 'text' => '#f59e0b', 'label' => 'Silent'],
-                        'offline' => ['dot' => '#ef4444', 'text' => '#ef4444', 'label' => 'Offline'],
+                        'online' => ['dot' => '#22c55e', 'text' => '#22c55e', 'label' => __('panel.pages.device_monitor.online')],
+                        'warning' => ['dot' => '#f59e0b', 'text' => '#f59e0b', 'label' => __('panel.pages.device_monitor.silent')],
+                        'offline' => ['dot' => '#ef4444', 'text' => '#ef4444', 'label' => __('panel.pages.device_monitor.offline')],
                     ][$device['status']];
                 @endphp
                 <x-filament::card>
@@ -58,50 +58,66 @@
                     <div
                         style="margin-top:0.75rem;font-size:0.75rem;color:rgb(156 163 175)"
                         @if ($device['last_seen_at'])
+                            {{--
+                                Translated server-side (Blade, where
+                                app()->getLocale() is already correct)
+                                and handed to Alpine as static JSON — the
+                                client-side tick() function never needs
+                                to know about locales, it just
+                                concatenates whatever suffix string it
+                                was given and drops it into the
+                                __TIME__ slot of the already-translated
+                                "last seen" template.
+                            --}}
                             x-data="{
                                 since: @js($device['last_seen_at']->toIso8601String()),
+                                labels: @js([
+                                    's' => __('panel.pages.device_monitor.ago_seconds'),
+                                    'm' => __('panel.pages.device_monitor.ago_minutes'),
+                                    'h' => __('panel.pages.device_monitor.ago_hours'),
+                                    'd' => __('panel.pages.device_monitor.ago_days'),
+                                    'template' => __('panel.pages.device_monitor.last_seen'),
+                                ]),
                                 text: '',
                                 tick() {
                                     const seconds = Math.max(0, Math.floor((Date.now() - new Date(this.since).getTime()) / 1000));
-                                    if (seconds < 60) { this.text = seconds + 's ago'; }
-                                    else if (seconds < 3600) { this.text = Math.floor(seconds / 60) + 'm ago'; }
-                                    else if (seconds < 86400) { this.text = Math.floor(seconds / 3600) + 'h ago'; }
-                                    else { this.text = Math.floor(seconds / 86400) + 'd ago'; }
+                                    if (seconds < 60) { this.text = seconds + this.labels.s; }
+                                    else if (seconds < 3600) { this.text = Math.floor(seconds / 60) + this.labels.m; }
+                                    else if (seconds < 86400) { this.text = Math.floor(seconds / 3600) + this.labels.h; }
+                                    else { this.text = Math.floor(seconds / 86400) + this.labels.d; }
                                 },
                             }"
                             x-init="tick(); setInterval(() => tick(), 1000)"
-                            x-text="'Last seen ' + text"
+                            x-text="labels.template.replace('__TIME__', text)"
                         @endif
                     >
                         @if (! $device['last_seen_at'])
-                            Never seen
+                            {{ __('panel.pages.device_monitor.never_seen') }}
                         @endif
                     </div>
                 </x-filament::card>
             @empty
                 <x-filament::card>
-                    <span style="color:rgb(156 163 175)">No devices configured yet — add one under Devices.</span>
+                    <span style="color:rgb(156 163 175)">{{ __('panel.pages.device_monitor.no_devices') }}</span>
                 </x-filament::card>
             @endforelse
         </div>
 
         {{-- Simulate scan --}}
         <x-filament::card>
-            <div style="font-weight:600;margin-bottom:0.75rem">Simulate a scan</div>
+            <div style="font-weight:600;margin-bottom:0.75rem">{{ __('panel.pages.device_monitor.simulate_scan_heading') }}</div>
             <p style="font-size:0.8125rem;color:rgb(156 163 175);margin-bottom:0.75rem">
-                No device on site yet, or want to see the feed below move without walking to the corridor?
-                Pick a device and an enrolled teacher and fire one real scan through the same pipeline a live
-                terminal uses.
+                {{ __('panel.pages.device_monitor.simulate_scan_body') }}
             </p>
 
             @if ($this->enrolledTeachers->isEmpty())
                 <div style="font-size:0.8125rem;color:rgb(156 163 175)">
-                    No teacher has a biometric ID enrolled yet — add one under Teacher Biometric IDs first.
+                    {{ __('panel.pages.device_monitor.no_enrolled_teachers') }}
                 </div>
             @else
                 <div style="display:flex;flex-wrap:wrap;align-items:flex-end;gap:0.75rem">
                     <div style="flex:1;min-width:12rem">
-                        <label style="display:block;font-size:0.8125rem;font-weight:500;margin-bottom:0.25rem">Device</label>
+                        <label style="display:block;font-size:0.8125rem;font-weight:500;margin-bottom:0.25rem">{{ __('panel.common.device') }}</label>
                         <x-filament::input.wrapper>
                             <x-filament::input.select wire:model="selectedDeviceId">
                                 @foreach ($this->devices as $device)
@@ -111,10 +127,10 @@
                         </x-filament::input.wrapper>
                     </div>
                     <div style="flex:1;min-width:12rem">
-                        <label style="display:block;font-size:0.8125rem;font-weight:500;margin-bottom:0.25rem">Teacher</label>
+                        <label style="display:block;font-size:0.8125rem;font-weight:500;margin-bottom:0.25rem">{{ __('panel.common.teacher') }}</label>
                         <x-filament::input.wrapper>
                             <x-filament::input.select wire:model="selectedEnrolmentId">
-                                <option value="">Select a teacher…</option>
+                                <option value="">{{ __('panel.pages.device_monitor.select_teacher_placeholder') }}</option>
                                 @foreach ($this->enrolledTeachers as $enrolment)
                                     <option value="{{ $enrolment->id }}">{{ $enrolment->teacher->full_name }} ({{ $enrolment->teacher->staff_no }})</option>
                                 @endforeach
@@ -122,7 +138,7 @@
                         </x-filament::input.wrapper>
                     </div>
                     <x-filament::button wire:click="simulateScan" icon="heroicon-o-finger-print">
-                        Simulate scan
+                        {{ __('panel.pages.device_monitor.simulate_scan_button') }}
                     </x-filament::button>
                 </div>
             @endif
@@ -131,18 +147,18 @@
         {{-- Live activity feed --}}
         <x-filament::card>
             <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:0.75rem">
-                <div style="font-weight:600">Live activity</div>
-                <div style="font-size:0.75rem;color:rgb(113 113 122)">Updates every 3s</div>
+                <div style="font-weight:600">{{ __('panel.pages.device_monitor.live_activity') }}</div>
+                <div style="font-size:0.75rem;color:rgb(113 113 122)">{{ __('panel.pages.device_monitor.updates_every_3s') }}</div>
             </div>
 
             <div style="overflow-x:auto">
                 <table style="width:100%;border-collapse:collapse;font-size:0.875rem">
                     <thead>
                         <tr style="text-align:left;border-bottom:1px solid rgb(63 63 70)">
-                            <th style="padding:0.5rem">Time</th>
-                            <th style="padding:0.5rem">Device</th>
-                            <th style="padding:0.5rem">Teacher</th>
-                            <th style="padding:0.5rem">Result</th>
+                            <th style="padding:0.5rem">{{ __('panel.pages.device_monitor.time') }}</th>
+                            <th style="padding:0.5rem">{{ __('panel.common.device') }}</th>
+                            <th style="padding:0.5rem">{{ __('panel.common.teacher') }}</th>
+                            <th style="padding:0.5rem">{{ __('panel.pages.device_monitor.result') }}</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -154,23 +170,23 @@
                                     @if ($event->teacher)
                                         {{ $event->teacher->full_name }}
                                     @else
-                                        <span style="color:rgb(156 163 175)">Unmatched ({{ $event->biometric_id ?? '—' }})</span>
+                                        <span style="color:rgb(156 163 175)">{{ __('panel.pages.device_monitor.unmatched') }} ({{ $event->biometric_id ?? '—' }})</span>
                                     @endif
                                 </td>
                                 <td style="padding:0.5rem">
                                     @if ($event->sub_event_type === 38)
-                                        <x-filament::badge color="success">Passed</x-filament::badge>
+                                        <x-filament::badge color="success">{{ __('panel.pages.device_monitor.passed') }}</x-filament::badge>
                                     @elseif ($event->sub_event_type === 49)
-                                        <x-filament::badge color="danger">Failed</x-filament::badge>
+                                        <x-filament::badge color="danger">{{ __('panel.pages.device_monitor.failed') }}</x-filament::badge>
                                     @else
-                                        <x-filament::badge color="gray">Other</x-filament::badge>
+                                        <x-filament::badge color="gray">{{ __('panel.pages.device_monitor.other') }}</x-filament::badge>
                                     @endif
                                 </td>
                             </tr>
                         @empty
                             <tr>
                                 <td colspan="4" style="padding:1rem;text-align:center;color:rgb(156 163 175)">
-                                    No scans yet — simulate one above, or wait for the real device.
+                                    {{ __('panel.pages.device_monitor.no_scans_yet') }}
                                 </td>
                             </tr>
                         @endforelse

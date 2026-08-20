@@ -20,8 +20,8 @@
         <x-filament::callout
             color="gray"
             icon="heroicon-o-document"
-            heading="Not generated yet"
-            description="This report has no data yet. Go back to the list and use &quot;Generate report&quot; for this month."
+            :heading="__('panel.resources.monthly_reports.not_generated_heading')"
+            :description="__('panel.resources.monthly_reports.not_generated_description')"
         />
     @else
         <div style="display:flex;flex-direction:column;gap:1.5rem">
@@ -30,16 +30,16 @@
                     {{ $this->record->state->getLabel() }}
                 </x-filament::badge>
                 <span style="font-size:0.875rem;color:rgb(156 163 175)">
-                    Generated {{ \Illuminate\Support\Carbon::parse($snapshot['generated_at'])->diffForHumans() }}
+                    {{ __('panel.resources.monthly_reports.generated_prefix') }} {{ \Illuminate\Support\Carbon::parse($snapshot['generated_at'])->diffForHumans() }}
                 </span>
                 @if ($this->record->approved_by)
                     <span style="font-size:0.875rem;color:rgb(156 163 175)">
-                        · Approved by {{ $this->record->approvedBy->name }}
+                        · {{ __('panel.common.approved_by') }} {{ $this->record->approvedBy->name }}
                     </span>
                 @endif
                 @if ($this->record->sent_to_hr_at)
                     <span style="font-size:0.875rem;color:rgb(156 163 175)">
-                        · Sent to HR {{ $this->record->sent_to_hr_at->diffForHumans() }}
+                        · {{ __('panel.resources.monthly_reports.sent_to_hr') }} {{ $this->record->sent_to_hr_at->diffForHumans() }}
                     </span>
                 @endif
             </div>
@@ -48,26 +48,26 @@
                 <x-filament::callout
                     color="danger"
                     icon="heroicon-o-exclamation-triangle"
-                    heading="{{ $snapshot['totals']['pending'] }} period(s) still pending"
-                    description="Unpaired or location-mismatch results included below are not counted as present or absent until the Exception Queue resolves them. Resolve those first, or approve knowing this report undercounts affected teachers."
+                    heading="{{ __('panel.resources.monthly_reports.pending_heading', ['count' => $snapshot['totals']['pending']]) }}"
+                    :description="__('panel.resources.monthly_reports.pending_description')"
                 />
             @endif
 
             <div style="display:grid;grid-template-columns:repeat(auto-fit, minmax(10rem, 1fr));gap:1rem">
                 <x-filament::card>
-                    <div style="font-size:0.75rem;color:rgb(156 163 175)">Payable hours (hourly staff)</div>
+                    <div style="font-size:0.75rem;color:rgb(156 163 175)">{{ \App\Enums\EmploymentType::Hourly->getLabel() }} — {{ __('panel.resources.monthly_reports.hours') }}</div>
                     <div style="font-size:1.5rem;font-weight:600">{{ $snapshot['totals']['payable_hours'] }}</div>
                 </x-filament::card>
                 <x-filament::card>
-                    <div style="font-size:0.75rem;color:rgb(156 163 175)">Oversight hours (salaried staff)</div>
+                    <div style="font-size:0.75rem;color:rgb(156 163 175)">{{ \App\Enums\EmploymentType::Salaried->getLabel() }} — {{ __('panel.resources.monthly_reports.hours') }}</div>
                     <div style="font-size:1.5rem;font-weight:600">{{ $snapshot['totals']['oversight_hours'] }}</div>
                 </x-filament::card>
                 <x-filament::card>
-                    <div style="font-size:0.75rem;color:rgb(156 163 175)">Present</div>
+                    <div style="font-size:0.75rem;color:rgb(156 163 175)">{{ \App\Enums\PeriodStatus::Present->getLabel() }}</div>
                     <div style="font-size:1.5rem;font-weight:600">{{ $snapshot['totals']['present'] + $snapshot['totals']['present_admin'] }}</div>
                 </x-filament::card>
                 <x-filament::card>
-                    <div style="font-size:0.75rem;color:rgb(156 163 175)">Absent</div>
+                    <div style="font-size:0.75rem;color:rgb(156 163 175)">{{ \App\Enums\PeriodStatus::Absent->getLabel() }}</div>
                     <div style="font-size:1.5rem;font-weight:600">{{ $snapshot['totals']['absent'] + $snapshot['totals']['absent_justified'] }}</div>
                 </x-filament::card>
             </div>
@@ -77,15 +77,15 @@
                     <table style="width:100%;border-collapse:collapse;font-size:0.875rem">
                         <thead>
                             <tr style="text-align:left;border-bottom:1px solid rgb(63 63 70)">
-                                <th style="padding:0.5rem">Staff No</th>
-                                <th style="padding:0.5rem">Teacher</th>
-                                <th style="padding:0.5rem">Type</th>
-                                <th style="padding:0.5rem;text-align:right">Present</th>
-                                <th style="padding:0.5rem;text-align:right">Present (admin)</th>
-                                <th style="padding:0.5rem;text-align:right">Absent</th>
-                                <th style="padding:0.5rem;text-align:right">Absent (justified)</th>
-                                <th style="padding:0.5rem;text-align:right">Pending</th>
-                                <th style="padding:0.5rem;text-align:right">Hours</th>
+                                <th style="padding:0.5rem">{{ __('panel.common.staff_no') }}</th>
+                                <th style="padding:0.5rem">{{ __('panel.common.teacher') }}</th>
+                                <th style="padding:0.5rem">{{ __('panel.resources.monthly_reports.type') }}</th>
+                                <th style="padding:0.5rem;text-align:right">{{ \App\Enums\PeriodStatus::Present->getLabel() }}</th>
+                                <th style="padding:0.5rem;text-align:right">{{ \App\Enums\PeriodStatus::PresentAdmin->getLabel() }}</th>
+                                <th style="padding:0.5rem;text-align:right">{{ \App\Enums\PeriodStatus::Absent->getLabel() }}</th>
+                                <th style="padding:0.5rem;text-align:right">{{ \App\Enums\PeriodStatus::AbsentJustified->getLabel() }}</th>
+                                <th style="padding:0.5rem;text-align:right">{{ __('panel.resources.monthly_reports.pending') }}</th>
+                                <th style="padding:0.5rem;text-align:right">{{ __('panel.resources.monthly_reports.hours') }}</th>
                                 <th style="padding:0.5rem"></th>
                             </tr>
                         </thead>
@@ -94,7 +94,7 @@
                                 <tr style="border-bottom:1px solid rgb(39 39 42)">
                                     <td style="padding:0.5rem">{{ $row['staff_no'] }}</td>
                                     <td style="padding:0.5rem">{{ $row['full_name'] }}</td>
-                                    <td style="padding:0.5rem;text-transform:capitalize">{{ $row['employment_type'] }}</td>
+                                    <td style="padding:0.5rem">{{ \App\Enums\EmploymentType::from($row['employment_type'])->getLabel() }}</td>
                                     <td style="padding:0.5rem;text-align:right">{{ $row['present'] }}</td>
                                     <td style="padding:0.5rem;text-align:right">{{ $row['present_admin'] }}</td>
                                     <td style="padding:0.5rem;text-align:right">{{ $row['absent'] }}</td>
@@ -107,14 +107,14 @@
                                             target="_blank"
                                             style="color:rgb(251 146 60);text-decoration:none;font-size:0.8125rem;white-space:nowrap"
                                         >
-                                            Download PDF
+                                            {{ __('panel.common.download_pdf') }}
                                         </a>
                                     </td>
                                 </tr>
                             @empty
                                 <tr>
                                     <td colspan="10" style="padding:1rem;text-align:center;color:rgb(156 163 175)">
-                                        No period results for this month.
+                                        {{ __('panel.resources.monthly_reports.no_period_results') }}
                                     </td>
                                 </tr>
                             @endforelse
