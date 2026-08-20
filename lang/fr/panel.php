@@ -220,6 +220,7 @@ return [
             'actual_status' => 'Statut réel',
             'reason_help' => "Obligatoire — ceci devient partie de la piste d'audit (§9, §14).",
             'notification_override_recorded' => 'Correction enregistrée',
+            'empty_state' => 'Aucune exception en attente',
         ],
 
         'device_monitor' => [
@@ -257,11 +258,28 @@ return [
             'indicator_until' => "Jusqu'au :date",
             'override_tooltip' => ':status — :reason (:actor, :at)',
             'unknown_actor' => 'Inconnu',
+            'empty_state' => 'Aucune période trouvée',
         ],
 
     ],
 
-    'widgets' => [],
+    'widgets' => [
+        'attendance_overview' => [
+            'pending_exceptions' => 'Exceptions en attente',
+            'pending_exceptions_waiting' => "En attente dans la file d'exceptions",
+            'pending_exceptions_clear' => 'File vide',
+            'present_this_month' => 'Présences ce mois-ci',
+            'absent_this_month' => 'Absences ce mois-ci',
+            'hours_logged_this_month' => 'Heures enregistrées ce mois-ci',
+            'hours_breakdown' => ':payable payables · :oversight suivi',
+            'devices_reporting' => 'Appareils actifs',
+            'devices_silent' => 'Un ou plusieurs silencieux depuis 2h+',
+            'devices_all_active' => 'Tous les appareils actifs vus récemment',
+            'current_report' => 'Rapport de ce mois',
+            'current_report_not_generated' => 'Pas encore généré',
+            'current_report_description' => 'Cliquer pour ouvrir les rapports mensuels',
+        ],
+    ],
     'pdf' => [],
 
 ];

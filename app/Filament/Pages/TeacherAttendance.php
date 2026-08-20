@@ -81,6 +81,12 @@ class TeacherAttendance extends Page implements HasTable
                     ->current()
                     ->with(['teacher', 'slot', 'classCode', 'session', 'overrideBy'])
             )
+            // Standalone Page, not a Resource — Filament's empty-state
+            // otherwise auto-derives an untranslated "period results"
+            // from the model class name, since that inference only
+            // routes through getModelLabel()/getPluralModelLabel() on
+            // an actual Resource, not a raw ->query() on a custom page.
+            ->emptyStateHeading(__('panel.pages.teacher_attendance.empty_state'))
             ->defaultSort('date', 'desc')
             ->columns([
                 TextColumn::make('date')

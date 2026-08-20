@@ -75,6 +75,9 @@ class ExceptionQueue extends Page implements HasTable
                     ->whereIn('status', [PeriodStatus::Unpaired, PeriodStatus::LocationMismatch])
                     ->whereNull('override_status')
             )
+            // Standalone Page, not a Resource — see the identical note
+            // in TeacherAttendance::table().
+            ->emptyStateHeading(__('panel.pages.exception_queue.empty_state'))
             ->defaultSort('date', 'desc')
             ->columns([
                 TextColumn::make('date')->label(__('panel.common.date'))->date()->sortable(),

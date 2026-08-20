@@ -57,31 +57,38 @@ class AttendanceOverview extends StatsOverviewWidget
         $reportState = $currentReport?->state ?? null;
 
         return [
-            Stat::make('Pending exceptions', $pending)
-                ->description($pending > 0 ? 'Waiting in the exception queue' : 'Queue is clear')
+            Stat::make(__('panel.widgets.attendance_overview.pending_exceptions'), $pending)
+                ->description($pending > 0
+                    ? __('panel.widgets.attendance_overview.pending_exceptions_waiting')
+                    : __('panel.widgets.attendance_overview.pending_exceptions_clear'))
                 ->descriptionIcon($pending > 0 ? Heroicon::OutlinedExclamationTriangle : Heroicon::OutlinedCheckCircle)
                 ->color($pending > 0 ? 'danger' : 'success')
                 ->url(ExceptionQueue::getUrl()),
 
-            Stat::make('Present this month', $snapshot['totals']['present'] + $snapshot['totals']['present_admin'])
-                ->description($month->format('F Y'))
+            Stat::make(__('panel.widgets.attendance_overview.present_this_month'), $snapshot['totals']['present'] + $snapshot['totals']['present_admin'])
+                ->description($month->translatedFormat('F Y'))
                 ->color('success'),
 
-            Stat::make('Absent this month', $snapshot['totals']['absent'] + $snapshot['totals']['absent_justified'])
-                ->description($month->format('F Y'))
+            Stat::make(__('panel.widgets.attendance_overview.absent_this_month'), $snapshot['totals']['absent'] + $snapshot['totals']['absent_justified'])
+                ->description($month->translatedFormat('F Y'))
                 ->color(($snapshot['totals']['absent'] + $snapshot['totals']['absent_justified']) > 0 ? 'warning' : 'success'),
 
-            Stat::make('Hours logged this month', $snapshot['totals']['payable_hours'] + $snapshot['totals']['oversight_hours'])
-                ->description($snapshot['totals']['payable_hours'].' payable · '.$snapshot['totals']['oversight_hours'].' oversight')
+            Stat::make(__('panel.widgets.attendance_overview.hours_logged_this_month'), $snapshot['totals']['payable_hours'] + $snapshot['totals']['oversight_hours'])
+                ->description(__('panel.widgets.attendance_overview.hours_breakdown', [
+                    'payable' => $snapshot['totals']['payable_hours'],
+                    'oversight' => $snapshot['totals']['oversight_hours'],
+                ]))
                 ->color('info'),
 
-            Stat::make('Devices reporting', ($devicesActive - $devicesSilent).' / '.$devicesActive)
-                ->description($devicesSilent > 0 ? 'One or more silent for 2h+' : 'All active devices seen recently')
+            Stat::make(__('panel.widgets.attendance_overview.devices_reporting'), ($devicesActive - $devicesSilent).' / '.$devicesActive)
+                ->description($devicesSilent > 0
+                    ? __('panel.widgets.attendance_overview.devices_silent')
+                    : __('panel.widgets.attendance_overview.devices_all_active'))
                 ->descriptionIcon($devicesSilent > 0 ? Heroicon::OutlinedSignalSlash : Heroicon::OutlinedSignal)
                 ->color($devicesSilent > 0 ? 'warning' : 'success'),
 
-            Stat::make('This month\'s report', $reportState?->getLabel() ?? 'Not generated')
-                ->description('Click to open Monthly Reports')
+            Stat::make(__('panel.widgets.attendance_overview.current_report'), $reportState?->getLabel() ?? __('panel.widgets.attendance_overview.current_report_not_generated'))
+                ->description(__('panel.widgets.attendance_overview.current_report_description'))
                 ->descriptionIcon(Heroicon::OutlinedDocumentChartBar)
                 ->color($reportState === ReportState::SentToHr ? 'success' : 'gray')
                 ->url(MonthlyReportResource::getUrl()),

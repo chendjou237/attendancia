@@ -251,6 +251,7 @@ return [
             'actual_status' => 'Actual status',
             'reason_help' => 'Mandatory — this becomes part of the audit trail (§9, §14).',
             'notification_override_recorded' => 'Override recorded',
+            'empty_state' => 'No pending exceptions',
         ],
 
         'device_monitor' => [
@@ -288,11 +289,28 @@ return [
             'indicator_until' => 'Until :date',
             'override_tooltip' => ':status — :reason (:actor, :at)',
             'unknown_actor' => 'Unknown',
+            'empty_state' => 'No periods found',
         ],
 
     ],
 
-    'widgets' => [],
+    'widgets' => [
+        'attendance_overview' => [
+            'pending_exceptions' => 'Pending exceptions',
+            'pending_exceptions_waiting' => 'Waiting in the exception queue',
+            'pending_exceptions_clear' => 'Queue is clear',
+            'present_this_month' => 'Present this month',
+            'absent_this_month' => 'Absent this month',
+            'hours_logged_this_month' => 'Hours logged this month',
+            'hours_breakdown' => ':payable payable · :oversight oversight',
+            'devices_reporting' => 'Devices reporting',
+            'devices_silent' => 'One or more silent for 2h+',
+            'devices_all_active' => 'All active devices seen recently',
+            'current_report' => "This month's report",
+            'current_report_not_generated' => 'Not generated',
+            'current_report_description' => 'Click to open Monthly Reports',
+        ],
+    ],
     'pdf' => [],
 
 ];
