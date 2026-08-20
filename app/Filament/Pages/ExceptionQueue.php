@@ -3,6 +3,7 @@
 namespace App\Filament\Pages;
 
 use App\Enums\PeriodStatus;
+use App\Enums\SessionAnomaly;
 use App\Models\AuditLog;
 use App\Models\PeriodResult;
 use BackedEnum;
@@ -70,7 +71,13 @@ class ExceptionQueue extends Page implements HasTable
                 TextColumn::make('slot.seq')->label('Period'),
                 TextColumn::make('classCode.code')->label('Class'),
                 TextColumn::make('status')->badge()->color('danger'),
-                TextColumn::make('session.anomaly_code')->label('Why')->badge()->placeholder('—'),
+                TextColumn::make('session.anomaly_code')
+                    ->label('Why')
+                    ->badge()
+                    ->placeholder('—')
+                    ->formatStateUsing(fn (?string $state): ?string => filled($state)
+                        ? (SessionAnomaly::tryFrom($state)?->getLabel() ?? $state)
+                        : null),
             ])
             ->recordActions([
                 Action::make('override')

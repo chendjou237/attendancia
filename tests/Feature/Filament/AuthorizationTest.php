@@ -1,6 +1,7 @@
 <?php
 
 use App\Filament\Pages\ExceptionQueue;
+use App\Filament\Pages\TeacherAttendance;
 use App\Filament\Resources\AuditLogs\AuditLogResource;
 use App\Filament\Resources\CalendarDays\CalendarDayResource;
 use App\Filament\Resources\ClassCodes\ClassCodeResource;
@@ -104,6 +105,20 @@ it('lets officer, principal, and admin reach the exception queue, blocks hr', fu
 
     loginAs('hr');
     $this->get(ExceptionQueue::getUrl())->assertForbidden();
+});
+
+it('lets officer, principal, and admin reach teacher attendance, blocks hr', function () {
+    loginAs('officer');
+    $this->get(TeacherAttendance::getUrl())->assertSuccessful();
+
+    loginAs('principal');
+    $this->get(TeacherAttendance::getUrl())->assertSuccessful();
+
+    loginAs('admin');
+    $this->get(TeacherAttendance::getUrl())->assertSuccessful();
+
+    loginAs('hr');
+    $this->get(TeacherAttendance::getUrl())->assertForbidden();
 });
 
 it('lets principal and admin view the audit log, blocks officer and hr', function () {

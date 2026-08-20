@@ -168,6 +168,14 @@ Once resolved, that record drops off the queue. It stays fully reversible in
 principle (another override can supersede it later), but the goal is to
 clear the queue daily so nothing goes stale.
 
+**Teacher Attendance** (main menu): search or pick a teacher, set a date or
+date range, and see every period in that range with its actual status,
+source, and — where one exists — the override that superseded the computed
+status (hover the pencil icon for who, when, and why). Defaults to today
+with no teacher picked, so it also works as a live "who's teaching right
+now" roster across everyone. This screen is read-only; to resolve a
+pending period, use the Exception queue above.
+
 **Manage timetable**, under a teacher's record: use this for one-off
 corrections — a teacher's schedule changed for one class, someone's covering
 for another teacher this week, etc. For a whole-term data load or a full
@@ -206,11 +214,15 @@ as needed up to that point; nothing is final until the Principal approves it.
 ## 3. Principal
 
 You're the approval gate between the Officer's day-to-day work and HR's
-payroll numbers. Your two recurring screens:
+payroll numbers. Your recurring screens:
 
 - **Exception queue** — see what the Officer is resolving and how (read
   along, or override something yourself if you disagree with a call already
   made — your override simply supersedes theirs and both are on record).
+- **Teacher Attendance** — the same search-a-teacher, filter-by-date view
+  the Officer uses, useful when a specific teacher's month is being
+  questioned and you want to see the day-by-day picture yourself rather
+  than only the monthly total.
 - **Audit log** — every override across the system, who made it, when, and
   the reason given. This is your record for "why does this teacher's month
   look like this."
