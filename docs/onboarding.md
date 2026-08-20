@@ -26,6 +26,11 @@ setting up the first accounts).
 relevant to your role — the sections below describe what each role actually
 sees and is responsible for.
 
+**Language**: the panel defaults to French. Click your name in the top
+right to switch to English for this session, or ask an Admin to set your
+account's language permanently (Users → your record → Language) so it
+sticks across logins without needing the switcher again.
+
 ## Status glossary
 
 Every period a teacher was scheduled to teach ends up with one of these:

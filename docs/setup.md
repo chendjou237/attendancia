@@ -259,9 +259,13 @@ work through:
 ## 9. Create user accounts
 
 Logins are created from the admin panel's **Users** screen (name, email,
-password, and one of the four roles — `admin`, `officer`, `principal`,
-`hr`) — but that screen only exists once a first `admin` account exists to
-sign in as, so bootstrap that one account from the command line:
+password, one of the four roles — `admin`, `officer`, `principal`, `hr` —
+and optionally a language: French or English, defaulting to French since
+the app is mostly used by francophone staff; leave it blank to have that
+user follow the site default and their own in-panel language switcher
+instead of a fixed per-account setting) — but that screen only exists once
+a first `admin` account exists to sign in as, so bootstrap that one account
+from the command line:
 
 ```bash
 php artisan tinker
