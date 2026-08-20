@@ -2,7 +2,7 @@
 <html>
 <head>
     <meta charset="utf-8">
-    <title>Monthly report — {{ $report->month->format('F Y') }}</title>
+    <title>{{ __('panel.resources.monthly_reports.pdf_subtitle_all', ['month' => $report->month->translatedFormat('F Y')]) }}</title>
     <style>
         body { font-family: DejaVu Sans, sans-serif; font-size: 11px; color: #111; }
         h1 { font-size: 18px; margin-bottom: 0; }
@@ -25,47 +25,39 @@
     </style>
 </head>
 <body>
-    <h1>Monthly Attendance Report</h1>
-    <div class="subtitle">{{ $report->month->format('F Y') }} — all teachers</div>
+    <h1>{{ __('panel.resources.monthly_reports.pdf_title') }}</h1>
+    <div class="subtitle">{{ __('panel.resources.monthly_reports.pdf_subtitle_all', ['month' => $report->month->translatedFormat('F Y')]) }}</div>
 
-    @if ($report->state->value !== 'principal_approved' && $report->state->value !== 'sent_to_hr')
-        <div class="draft-notice">
-            This report is still <strong>{{ $report->state->getLabel() }}</strong> — it has not been approved
-            and these numbers may still change before the month is closed out.
-        </div>
-    @endif
-
-    @if ($snapshot['has_pending_exceptions'])
-        <div class="draft-notice">
-            {{ $snapshot['totals']['pending'] }} period(s) across the school this month are still unresolved
-            (unpaired or location-mismatch) and are not counted as present or absent below until the
-            Exception Queue resolves them — the affected teachers' totals are undercounted, not wrong.
-        </div>
-    @endif
+    @include('pdf.partials.draft-notice', [
+        'report' => $report,
+        'pendingMessage' => $snapshot['has_pending_exceptions']
+            ? __('panel.resources.monthly_reports.pending_school', ['count' => $snapshot['totals']['pending']])
+            : null,
+    ])
 
     <table class="summary">
         <tr>
-            <td><span class="label">Payable hours (hourly staff)</span><span class="value">{{ $snapshot['totals']['payable_hours'] }}</span></td>
-            <td><span class="label">Oversight hours (salaried staff)</span><span class="value">{{ $snapshot['totals']['oversight_hours'] }}</span></td>
-            <td><span class="label">Present</span><span class="value">{{ $snapshot['totals']['present'] + $snapshot['totals']['present_admin'] }}</span></td>
-            <td><span class="label">Absent</span><span class="value">{{ $snapshot['totals']['absent'] + $snapshot['totals']['absent_justified'] }}</span></td>
-            <td><span class="label">Pending</span><span class="value">{{ $snapshot['totals']['pending'] }}</span></td>
+            <td><span class="label">{{ \App\Enums\EmploymentType::Hourly->getLabel() }} — {{ __('panel.resources.monthly_reports.hours') }}</span><span class="value">{{ $snapshot['totals']['payable_hours'] }}</span></td>
+            <td><span class="label">{{ \App\Enums\EmploymentType::Salaried->getLabel() }} — {{ __('panel.resources.monthly_reports.hours') }}</span><span class="value">{{ $snapshot['totals']['oversight_hours'] }}</span></td>
+            <td><span class="label">{{ \App\Enums\PeriodStatus::Present->getLabel() }}</span><span class="value">{{ $snapshot['totals']['present'] + $snapshot['totals']['present_admin'] }}</span></td>
+            <td><span class="label">{{ \App\Enums\PeriodStatus::Absent->getLabel() }}</span><span class="value">{{ $snapshot['totals']['absent'] + $snapshot['totals']['absent_justified'] }}</span></td>
+            <td><span class="label">{{ __('panel.resources.monthly_reports.pending') }}</span><span class="value">{{ $snapshot['totals']['pending'] }}</span></td>
         </tr>
     </table>
 
     <table class="teachers">
         <thead>
             <tr>
-                <th>Staff No</th>
-                <th>Teacher</th>
-                <th>Type</th>
-                <th class="num">Present</th>
-                <th class="num">Present (admin)</th>
-                <th class="num">Absent</th>
-                <th class="num">Absent (justified)</th>
-                <th class="num">Pending</th>
-                <th class="num">Total periods</th>
-                <th class="num">Hours</th>
+                <th>{{ __('panel.common.staff_no') }}</th>
+                <th>{{ __('panel.common.teacher') }}</th>
+                <th>{{ __('panel.resources.monthly_reports.type') }}</th>
+                <th class="num">{{ \App\Enums\PeriodStatus::Present->getLabel() }}</th>
+                <th class="num">{{ \App\Enums\PeriodStatus::PresentAdmin->getLabel() }}</th>
+                <th class="num">{{ \App\Enums\PeriodStatus::Absent->getLabel() }}</th>
+                <th class="num">{{ \App\Enums\PeriodStatus::AbsentJustified->getLabel() }}</th>
+                <th class="num">{{ __('panel.resources.monthly_reports.pending') }}</th>
+                <th class="num">{{ __('panel.resources.monthly_reports.total_periods') }}</th>
+                <th class="num">{{ __('panel.resources.monthly_reports.hours') }}</th>
             </tr>
         </thead>
         <tbody>
@@ -73,7 +65,7 @@
                 <tr>
                     <td>{{ $row['staff_no'] }}</td>
                     <td>{{ $row['full_name'] }}</td>
-                    <td style="text-transform: capitalize">{{ $row['employment_type'] }}</td>
+                    <td>{{ \App\Enums\EmploymentType::from($row['employment_type'])->getLabel() }}</td>
                     <td class="num">{{ $row['present'] }}</td>
                     <td class="num">{{ $row['present_admin'] }}</td>
                     <td class="num">{{ $row['absent'] }}</td>
@@ -84,23 +76,12 @@
                 </tr>
             @empty
                 <tr>
-                    <td colspan="10" style="text-align: center; color: #888; padding: 12px">No period results for this month.</td>
+                    <td colspan="10" style="text-align: center; color: #888; padding: 12px">{{ __('panel.resources.monthly_reports.no_period_results') }}</td>
                 </tr>
             @endforelse
         </tbody>
     </table>
 
-    <div class="meta">
-        Report state: {{ $report->state->getLabel() }}
-        @if ($report->approved_by) &middot; Approved by {{ $report->approvedBy->name }} @endif
-        @if ($report->sent_to_hr_at) &middot; Sent to HR {{ $report->sent_to_hr_at->format('d M Y') }} @endif
-    </div>
-
-    <div class="footer">
-        {{ $snapshot['hours_basis'] }}
-        <br>
-        Generated {{ now()->format('d M Y, H:i') }} for internal use — not a substitute for the official
-        monthly report record.
-    </div>
+    @include('pdf.partials.footer', ['report' => $report, 'snapshot' => $snapshot])
 </body>
 </html>

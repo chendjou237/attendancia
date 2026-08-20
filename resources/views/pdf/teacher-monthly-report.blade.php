@@ -2,7 +2,7 @@
 <html>
 <head>
     <meta charset="utf-8">
-    <title>{{ $row['staff_no'] }} — {{ $report->month->format('F Y') }}</title>
+    <title>{{ $row['staff_no'] }} — {{ $report->month->translatedFormat('F Y') }}</title>
     <style>
         body { font-family: DejaVu Sans, sans-serif; font-size: 12px; color: #111; }
         h1 { font-size: 18px; margin-bottom: 0; }
@@ -20,40 +20,32 @@
     </style>
 </head>
 <body>
-    <h1>Monthly Attendance Report</h1>
-    <div class="subtitle">{{ $row['full_name'] }} ({{ $row['staff_no'] }}) — {{ $report->month->format('F Y') }}</div>
+    <h1>{{ __('panel.resources.monthly_reports.pdf_title') }}</h1>
+    <div class="subtitle">{{ $row['full_name'] }} ({{ $row['staff_no'] }}) — {{ $report->month->translatedFormat('F Y') }}</div>
 
-    @if ($report->state->value !== 'principal_approved' && $report->state->value !== 'sent_to_hr')
-        <div class="draft-notice">
-            This report is still <strong>{{ $report->state->getLabel() }}</strong> — it has not been approved
-            and these numbers may still change before the month is closed out.
-        </div>
-    @endif
-
-    @if (($row['pending'] ?? 0) > 0)
-        <div class="draft-notice">
-            {{ $row['pending'] }} period(s) for this teacher this month are still unresolved (unpaired or
-            location-mismatch) and are not counted as present or absent below until the Exception Queue
-            resolves them.
-        </div>
-    @endif
+    @include('pdf.partials.draft-notice', [
+        'report' => $report,
+        'pendingMessage' => ($row['pending'] ?? 0) > 0
+            ? __('panel.resources.monthly_reports.pending_teacher', ['count' => $row['pending']])
+            : null,
+    ])
 
     <table>
         <thead>
             <tr>
-                <th>Employment type</th>
-                <th>Present</th>
-                <th>Present (admin)</th>
-                <th>Absent</th>
-                <th>Absent (justified)</th>
-                <th>Pending</th>
-                <th>Total periods</th>
-                <th>Hours</th>
+                <th>{{ __('panel.common.employment_type') }}</th>
+                <th>{{ \App\Enums\PeriodStatus::Present->getLabel() }}</th>
+                <th>{{ \App\Enums\PeriodStatus::PresentAdmin->getLabel() }}</th>
+                <th>{{ \App\Enums\PeriodStatus::Absent->getLabel() }}</th>
+                <th>{{ \App\Enums\PeriodStatus::AbsentJustified->getLabel() }}</th>
+                <th>{{ __('panel.resources.monthly_reports.pending') }}</th>
+                <th>{{ __('panel.resources.monthly_reports.total_periods') }}</th>
+                <th>{{ __('panel.resources.monthly_reports.hours') }}</th>
             </tr>
         </thead>
         <tbody>
             <tr class="totals">
-                <td style="text-transform: capitalize">{{ $row['employment_type'] }}</td>
+                <td>{{ \App\Enums\EmploymentType::from($row['employment_type'])->getLabel() }}</td>
                 <td>{{ $row['present'] }}</td>
                 <td>{{ $row['present_admin'] }}</td>
                 <td>{{ $row['absent'] }}</td>
@@ -65,17 +57,6 @@
         </tbody>
     </table>
 
-    <div class="meta">
-        Report state: {{ $report->state->getLabel() }}
-        @if ($report->approved_by) &middot; Approved by {{ $report->approvedBy->name }} @endif
-        @if ($report->sent_to_hr_at) &middot; Sent to HR {{ $report->sent_to_hr_at->format('d M Y') }} @endif
-    </div>
-
-    <div class="footer">
-        {{ $snapshot['hours_basis'] }}
-        <br>
-        Generated {{ now()->format('d M Y, H:i') }} for internal use — not a substitute for the official
-        monthly report record.
-    </div>
+    @include('pdf.partials.footer', ['report' => $report, 'snapshot' => $snapshot])
 </body>
 </html>
