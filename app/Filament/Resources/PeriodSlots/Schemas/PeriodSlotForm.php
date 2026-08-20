@@ -11,43 +11,54 @@ use Filament\Schemas\Schema;
 
 class PeriodSlotForm
 {
-    /** Carbon convention: 0 = Sunday .. 6 = Saturday. */
-    public const DAY_OPTIONS = [
-        1 => 'Monday',
-        2 => 'Tuesday',
-        3 => 'Wednesday',
-        4 => 'Thursday',
-        5 => 'Friday',
-        6 => 'Saturday',
-        0 => 'Sunday',
-    ];
+    /**
+     * Monday-first for the dropdown's visual order (matches the school
+     * week), sourced from the single shared translated day-name list in
+     * lang/{en,fr}/panel.php (Carbon convention: 0 = Sunday .. 6 =
+     * Saturday) rather than a second hardcoded array — see
+     * ManageTimetable::dayLabel() for the other previously-duplicated copy.
+     */
+    public static function dayOptions(): array
+    {
+        $days = __('panel.days');
+
+        return [
+            1 => $days[1], 2 => $days[2], 3 => $days[3],
+            4 => $days[4], 5 => $days[5], 6 => $days[6],
+            0 => $days[0],
+        ];
+    }
 
     public static function configure(Schema $schema): Schema
     {
         return $schema
             ->components([
                 Select::make('day_of_week')
-                    ->label('Day')
-                    ->options(self::DAY_OPTIONS)
+                    ->label(__('panel.common.day'))
+                    ->options(self::dayOptions())
                     ->required(),
                 TextInput::make('seq')
-                    ->label('Sequence')
+                    ->label(__('panel.resources.period_slots.sequence'))
                     ->numeric()
                     ->required()
-                    ->helperText('Order within the day (1, 2, 3…) — determines position in the bell-schedule grid.'),
+                    ->helperText(__('panel.resources.period_slots.sequence_help')),
                 TimePicker::make('start_time')
+                    ->label(__('panel.common.start'))
                     ->required(),
                 TimePicker::make('end_time')
+                    ->label(__('panel.common.end'))
                     ->required()
                     ->after('start_time'),
                 Toggle::make('is_break')
-                    ->label('Break / lunch period'),
+                    ->label(__('panel.resources.period_slots.is_break')),
                 DatePicker::make('valid_from')
+                    ->label(__('panel.common.valid_from'))
                     ->required()
-                    ->helperText('Applies to this date onward. Existing computed results before this date are never rewritten.'),
+                    ->helperText(__('panel.resources.period_slots.valid_from_help')),
                 DatePicker::make('valid_to')
+                    ->label(__('panel.common.valid_to'))
                     ->afterOrEqual('valid_from')
-                    ->helperText('Leave empty if this is the current, open-ended version.'),
+                    ->helperText(__('panel.resources.period_slots.valid_to_help')),
             ]);
     }
 }

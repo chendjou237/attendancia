@@ -19,6 +19,7 @@ use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Concerns\InteractsWithTable;
 use Filament\Tables\Contracts\HasTable;
 use Filament\Tables\Table;
+use Illuminate\Contracts\Support\Htmlable;
 
 /**
  * §10: "The exception queue is a deliverable, not a nice-to-have."
@@ -48,6 +49,16 @@ class ExceptionQueue extends Page implements HasTable
         return auth()->user()?->hasAnyRole(['admin', 'officer', 'principal']) ?? false;
     }
 
+    public static function getNavigationLabel(): string
+    {
+        return __('panel.nav.exception_queue');
+    }
+
+    public function getTitle(): string|Htmlable
+    {
+        return __('panel.nav.exception_queue');
+    }
+
     public function content(Schema $schema): Schema
     {
         return $schema->components([
@@ -66,13 +77,13 @@ class ExceptionQueue extends Page implements HasTable
             )
             ->defaultSort('date', 'desc')
             ->columns([
-                TextColumn::make('date')->date()->sortable(),
-                TextColumn::make('teacher.full_name')->label('Teacher')->searchable(),
-                TextColumn::make('slot.seq')->label('Period'),
-                TextColumn::make('classCode.code')->label('Class'),
-                TextColumn::make('status')->badge()->color('danger'),
+                TextColumn::make('date')->label(__('panel.common.date'))->date()->sortable(),
+                TextColumn::make('teacher.full_name')->label(__('panel.common.teacher'))->searchable(),
+                TextColumn::make('slot.seq')->label(__('panel.common.period')),
+                TextColumn::make('classCode.code')->label(__('panel.common.class')),
+                TextColumn::make('status')->label(__('panel.common.status'))->badge()->color('danger'),
                 TextColumn::make('session.anomaly_code')
-                    ->label('Why')
+                    ->label(__('panel.common.why'))
                     ->badge()
                     ->placeholder('—')
                     ->formatStateUsing(fn (?string $state): ?string => filled($state)
@@ -81,11 +92,11 @@ class ExceptionQueue extends Page implements HasTable
             ])
             ->recordActions([
                 Action::make('override')
-                    ->label('Override')
+                    ->label(__('panel.pages.exception_queue.override_action'))
                     ->icon(Heroicon::OutlinedPencilSquare)
                     ->schema([
                         Select::make('override_status')
-                            ->label('Actual status')
+                            ->label(__('panel.pages.exception_queue.actual_status'))
                             ->options([
                                 PeriodStatus::Present->value => PeriodStatus::Present->getLabel(),
                                 PeriodStatus::Absent->value => PeriodStatus::Absent->getLabel(),
@@ -93,9 +104,9 @@ class ExceptionQueue extends Page implements HasTable
                             ])
                             ->required(),
                         Textarea::make('override_reason')
-                            ->label('Reason')
+                            ->label(__('panel.common.reason'))
                             ->required()
-                            ->helperText('Mandatory — this becomes part of the audit trail (§9, §14).'),
+                            ->helperText(__('panel.pages.exception_queue.reason_help')),
                     ])
                     ->action(function (PeriodResult $record, array $data): void {
                         $before = $record->only(['status', 'override_status', 'override_reason']);
@@ -115,7 +126,7 @@ class ExceptionQueue extends Page implements HasTable
                             after: $record->only(['status', 'override_status', 'override_reason']),
                         );
 
-                        Notification::make()->title('Override recorded')->success()->send();
+                        Notification::make()->title(__('panel.pages.exception_queue.notification_override_recorded'))->success()->send();
                     }),
             ]);
     }

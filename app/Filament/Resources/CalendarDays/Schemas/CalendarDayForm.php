@@ -17,19 +17,27 @@ class CalendarDayForm
         return $schema
             ->components([
                 DatePicker::make('date')
+                    ->label(__('panel.common.date'))
                     ->required(),
                 Select::make('day_type')
+                    ->label(__('panel.resources.calendar_days.day_type'))
                     ->options(DayType::class)
                     ->live()
                     ->required(),
                 Textarea::make('note')
+                    ->label(__('panel.common.note'))
                     ->columnSpanFull(),
                 // §13.2: which slots survive on a half-day.
                 Select::make('half_day_cutoff_slot_id')
-                    ->label('Half-day cutoff (last slot that still counts)')
+                    ->label(__('panel.resources.calendar_days.half_day_cutoff'))
                     ->options(fn () => PeriodSlot::query()->where('is_break', false)->orderBy('day_of_week')->orderBy('seq')
                         ->get()->mapWithKeys(fn (PeriodSlot $slot) => [
-                            $slot->id => sprintf('Day %d, period %d (%s–%s)', $slot->day_of_week, $slot->seq, $slot->start_time, $slot->end_time),
+                            $slot->id => __('panel.resources.calendar_days.slot_option', [
+                                'day' => __('panel.days.'.$slot->day_of_week),
+                                'period' => $slot->seq,
+                                'start' => $slot->start_time,
+                                'end' => $slot->end_time,
+                            ]),
                         ]))
                     ->searchable()
                     // $get('day_type') resolves through the Select's enum
@@ -39,11 +47,12 @@ class CalendarDayForm
                 // Decision (finding 1.7): scoped to class codes, not the
                 // whole day. Leave empty to suspend the whole school.
                 Select::make('suspendedClassCodes')
+                    ->label(__('panel.resources.calendar_days.scoped_to'))
                     ->relationship('suspendedClassCodes', 'code')
                     ->multiple()
                     ->searchable()
                     ->preload()
-                    ->helperText('Leave empty to suspend the whole school. Select specific classes for a partial suspension (e.g. one form sitting a sequence exam).')
+                    ->helperText(__('panel.resources.calendar_days.suspended_help'))
                     ->visible(fn (Get $get) => $get('day_type') === DayType::ClassesSuspended),
             ]);
     }

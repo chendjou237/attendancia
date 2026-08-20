@@ -19,6 +19,7 @@ use Filament\Tables\Filters\Filter;
 use Filament\Tables\Filters\Indicator;
 use Filament\Tables\Filters\SelectFilter;
 use Filament\Tables\Table;
+use Illuminate\Contracts\Support\Htmlable;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Carbon;
 
@@ -43,8 +44,6 @@ class TeacherAttendance extends Page implements HasTable
 
     protected static string|BackedEnum|null $navigationIcon = Heroicon::OutlinedUserCircle;
 
-    protected static ?string $navigationLabel = 'Teacher Attendance';
-
     protected string $view = 'filament.pages.teacher-attendance';
 
     /**
@@ -55,6 +54,16 @@ class TeacherAttendance extends Page implements HasTable
     public static function canAccess(): bool
     {
         return auth()->user()?->hasAnyRole(['admin', 'officer', 'principal']) ?? false;
+    }
+
+    public static function getNavigationLabel(): string
+    {
+        return __('panel.nav.teacher_attendance');
+    }
+
+    public function getTitle(): string|Htmlable
+    {
+        return __('panel.nav.teacher_attendance');
     }
 
     public function content(Schema $schema): Schema
@@ -75,25 +84,26 @@ class TeacherAttendance extends Page implements HasTable
             ->defaultSort('date', 'desc')
             ->columns([
                 TextColumn::make('date')
+                    ->label(__('panel.common.date'))
                     ->date()
                     ->sortable(),
                 TextColumn::make('teacher.full_name')
-                    ->label('Teacher')
+                    ->label(__('panel.common.teacher'))
                     ->searchable()
                     ->sortable(),
                 TextColumn::make('slot.seq')
-                    ->label('Period')
+                    ->label(__('panel.common.period'))
                     ->sortable(),
                 TextColumn::make('slot.start_time')
-                    ->label('Start')
+                    ->label(__('panel.common.start'))
                     ->time('H:i'),
                 TextColumn::make('slot.end_time')
-                    ->label('End')
+                    ->label(__('panel.common.end'))
                     ->time('H:i'),
                 TextColumn::make('classCode.code')
-                    ->label('Class'),
+                    ->label(__('panel.common.class')),
                 TextColumn::make('status')
-                    ->label('Status')
+                    ->label(__('panel.common.status'))
                     ->state(fn (PeriodResult $record): PeriodStatus => $record->effectiveStatus())
                     ->badge()
                     ->color(fn (PeriodStatus $state): string => match ($state) {
@@ -102,46 +112,46 @@ class TeacherAttendance extends Page implements HasTable
                         PeriodStatus::Absent => 'danger',
                     }),
                 TextColumn::make('source')
+                    ->label(__('panel.common.source'))
                     ->badge(),
                 TextColumn::make('session.anomaly_code')
-                    ->label('Why')
+                    ->label(__('panel.common.why'))
                     ->badge()
-                    ->placeholder('—')
+                    ->placeholder(__('panel.common.dash_placeholder'))
                     ->formatStateUsing(fn (?string $state): ?string => filled($state)
                         ? (SessionAnomaly::tryFrom($state)?->getLabel() ?? $state)
                         : null),
                 IconColumn::make('override_status')
-                    ->label('Override')
+                    ->label(__('panel.common.override'))
                     ->icon(fn (?PeriodStatus $state): ?BackedEnum => filled($state)
                         ? Heroicon::OutlinedPencilSquare
                         : null)
                     ->color('warning')
                     ->tooltip(fn (PeriodResult $record): ?string => filled($record->override_status)
-                        ? sprintf(
-                            '%s — %s (%s, %s)',
-                            $record->override_status->getLabel(),
-                            $record->override_reason,
-                            $record->overrideBy?->name ?? 'Unknown',
-                            $record->override_at?->format('d/m/Y H:i'),
-                        )
+                        ? __('panel.pages.teacher_attendance.override_tooltip', [
+                            'status' => $record->override_status->getLabel(),
+                            'reason' => $record->override_reason,
+                            'actor' => $record->overrideBy?->name ?? __('panel.pages.teacher_attendance.unknown_actor'),
+                            'at' => $record->override_at?->format('d/m/Y H:i'),
+                        ])
                         : null),
             ])
             ->filters([
                 SelectFilter::make('teacher')
-                    ->label('Teacher')
+                    ->label(__('panel.common.teacher'))
                     ->relationship('teacher', 'full_name')
                     ->searchable()
                     ->preload(),
 
                 Filter::make('date_range')
-                    ->label('Date range')
+                    ->label(__('panel.pages.teacher_attendance.date_range'))
                     ->schema([
                         DatePicker::make('from')
-                            ->label('From')
+                            ->label(__('panel.common.from'))
                             ->default(now()->toDateString())
                             ->native(false),
                         DatePicker::make('to')
-                            ->label('To')
+                            ->label(__('panel.common.to'))
                             ->default(now()->toDateString())
                             ->native(false),
                     ])
@@ -171,12 +181,12 @@ class TeacherAttendance extends Page implements HasTable
                         $indicators = [];
 
                         if ($data['from'] ?? null) {
-                            $indicators[] = Indicator::make('From '.Carbon::parse($data['from'])->format('d/m/Y'))
+                            $indicators[] = Indicator::make(__('panel.pages.teacher_attendance.indicator_from', ['date' => Carbon::parse($data['from'])->format('d/m/Y')]))
                                 ->removeField('from');
                         }
 
                         if ($data['to'] ?? null) {
-                            $indicators[] = Indicator::make('Until '.Carbon::parse($data['to'])->format('d/m/Y'))
+                            $indicators[] = Indicator::make(__('panel.pages.teacher_attendance.indicator_until', ['date' => Carbon::parse($data['to'])->format('d/m/Y')]))
                                 ->removeField('to');
                         }
 

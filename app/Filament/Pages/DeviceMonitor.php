@@ -10,6 +10,7 @@ use BackedEnum;
 use Filament\Notifications\Notification;
 use Filament\Pages\Page;
 use Filament\Support\Icons\Heroicon;
+use Illuminate\Contracts\Support\Htmlable;
 use Illuminate\Support\Collection;
 
 /**
@@ -38,8 +39,6 @@ class DeviceMonitor extends Page
 {
     protected static string|BackedEnum|null $navigationIcon = Heroicon::OutlinedSignal;
 
-    protected static ?string $navigationLabel = 'Device Monitor';
-
     protected string $view = 'filament.pages.device-monitor';
 
     public ?int $selectedDeviceId = null;
@@ -49,6 +48,16 @@ class DeviceMonitor extends Page
     public static function canAccess(): bool
     {
         return auth()->user()?->hasAnyRole(['admin', 'officer']) ?? false;
+    }
+
+    public static function getNavigationLabel(): string
+    {
+        return __('panel.nav.device_monitor');
+    }
+
+    public function getTitle(): string|Htmlable
+    {
+        return __('panel.nav.device_monitor');
     }
 
     public function mount(): void
@@ -115,7 +124,7 @@ class DeviceMonitor extends Page
         $enrolment = TeacherBiometricId::with('teacher')->find($this->selectedEnrolmentId);
 
         if ($device === null || $enrolment === null || $enrolment->teacher === null) {
-            Notification::make()->title('Pick a device and a teacher first')->warning()->send();
+            Notification::make()->title(__('panel.pages.device_monitor.notification_pick_device_teacher'))->warning()->send();
 
             return;
         }
@@ -123,7 +132,10 @@ class DeviceMonitor extends Page
         $simulator->scan($device, $enrolment->biometric_id);
 
         Notification::make()
-            ->title("Scan recorded — {$enrolment->teacher->full_name} on {$device->serial}")
+            ->title(__('panel.pages.device_monitor.notification_scan_recorded', [
+                'teacher' => $enrolment->teacher->full_name,
+                'device' => $device->serial,
+            ]))
             ->success()
             ->send();
     }

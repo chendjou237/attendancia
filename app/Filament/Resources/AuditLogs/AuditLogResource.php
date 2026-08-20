@@ -60,4 +60,14 @@ class AuditLogResource extends Resource
     {
         return false;
     }
+
+    public static function getModelLabel(): string
+    {
+        return __('panel.nav.audit_logs.singular');
+    }
+
+    public static function getPluralModelLabel(): string
+    {
+        return __('panel.nav.audit_logs.plural');
+    }
 }

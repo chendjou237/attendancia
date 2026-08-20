@@ -17,19 +17,22 @@ class TeacherBiometricIdsTable
             ->defaultSort('valid_from', 'desc')
             ->columns([
                 TextColumn::make('teacher.full_name')
-                    ->label('Teacher')
+                    ->label(__('panel.common.teacher'))
                     ->searchable(),
                 TextColumn::make('biometric_id')
+                    ->label(__('panel.resources.teacher_biometric_ids.biometric_id'))
                     ->searchable(),
                 TextColumn::make('valid_from')
+                    ->label(__('panel.common.valid_from'))
                     ->date()
                     ->sortable(),
                 TextColumn::make('valid_to')
+                    ->label(__('panel.common.valid_to'))
                     ->date()
                     ->sortable()
-                    ->placeholder('Active'),
+                    ->placeholder(__('panel.resources.teacher_biometric_ids.active_placeholder')),
                 IconColumn::make('is_active')
-                    ->label('Active')
+                    ->label(__('panel.common.active'))
                     ->boolean()
                     ->state(fn ($record) => $record->valid_to === null),
             ])

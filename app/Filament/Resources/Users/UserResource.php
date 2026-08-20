@@ -56,4 +56,14 @@ class UserResource extends Resource
     {
         return auth()->user()?->hasRole('admin') ?? false;
     }
+
+    public static function getModelLabel(): string
+    {
+        return __('panel.nav.users.singular');
+    }
+
+    public static function getPluralModelLabel(): string
+    {
+        return __('panel.nav.users.plural');
+    }
 }

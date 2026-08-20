@@ -94,4 +94,14 @@ class TeacherResource extends Resource
     {
         return auth()->user()?->hasRole('admin') ?? false;
     }
+
+    public static function getModelLabel(): string
+    {
+        return __('panel.nav.teachers.singular');
+    }
+
+    public static function getPluralModelLabel(): string
+    {
+        return __('panel.nav.teachers.plural');
+    }
 }

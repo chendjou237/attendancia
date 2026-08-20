@@ -13,11 +13,14 @@ class RoomForm
         return $schema
             ->components([
                 Select::make('corridor_id')
+                    ->label(__('panel.common.corridor'))
                     ->relationship('corridor', 'name')
                     ->required(),
                 TextInput::make('code')
+                    ->label(__('panel.common.code'))
                     ->required(),
                 TextInput::make('name')
+                    ->label(__('panel.common.name'))
                     ->required(),
             ]);
     }

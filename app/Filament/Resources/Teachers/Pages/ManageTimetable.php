@@ -32,8 +32,6 @@ class ManageTimetable extends Page
     /** Monday .. Saturday. Carbon convention: 0 = Sunday .. 6 = Saturday. */
     public const DAYS = [1, 2, 3, 4, 5, 6];
 
-    private const DAY_NAMES = [0 => 'Sunday', 1 => 'Monday', 2 => 'Tuesday', 3 => 'Wednesday', 4 => 'Thursday', 5 => 'Friday', 6 => 'Saturday'];
-
     /** Exposed for the Blade view — `self::` doesn't resolve there. */
     public array $days = self::DAYS;
 
@@ -64,7 +62,7 @@ class ManageTimetable extends Page
 
     public function getTitle(): string
     {
-        return "Timetable — {$this->record->full_name}";
+        return __('panel.resources.teachers.timetable_title', ['name' => $this->record->full_name]);
     }
 
     public function updatedVersionId(): void
@@ -107,7 +105,7 @@ class ManageTimetable extends Page
         $this->versionId = $version->id;
         $this->loadGrid();
 
-        Notification::make()->title('New timetable version created')->success()->send();
+        Notification::make()->title(__('panel.resources.teachers.notification_version_created'))->success()->send();
     }
 
     private function loadGrid(): void
@@ -199,7 +197,7 @@ class ManageTimetable extends Page
             }
         });
 
-        Notification::make()->title('Timetable saved')->success()->send();
+        Notification::make()->title(__('panel.resources.teachers.notification_timetable_saved'))->success()->send();
     }
 
     /** @return Collection<int, ClassCode> */
@@ -216,6 +214,6 @@ class ManageTimetable extends Page
 
     public function dayLabel(int $day): string
     {
-        return self::DAY_NAMES[$day];
+        return __('panel.days.'.$day);
     }
 }

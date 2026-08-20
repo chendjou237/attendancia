@@ -14,18 +14,21 @@ class TeacherBiometricIdForm
         return $schema
             ->components([
                 Select::make('teacher_id')
+                    ->label(__('panel.common.teacher'))
                     ->relationship('teacher', 'full_name')
                     ->searchable()
                     ->required(),
                 TextInput::make('biometric_id')
-                    ->label('Biometric ID (employeeNoString)')
+                    ->label(__('panel.resources.teacher_biometric_ids.biometric_id'))
                     ->required()
-                    ->helperText('The device-side id — confirm the exact field name and value against a real scan first (§13.5).'),
+                    ->helperText(__('panel.resources.teacher_biometric_ids.biometric_id_help')),
                 DatePicker::make('valid_from')
+                    ->label(__('panel.common.valid_from'))
                     ->required()
                     ->default(now()),
                 DatePicker::make('valid_to')
-                    ->helperText('Leave empty for an active mapping. Assigning this id to a different teacher automatically closes this one out.'),
+                    ->label(__('panel.common.valid_to'))
+                    ->helperText(__('panel.resources.teacher_biometric_ids.valid_to_help')),
             ]);
     }
 }

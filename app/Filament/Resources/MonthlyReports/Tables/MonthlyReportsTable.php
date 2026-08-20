@@ -16,9 +16,11 @@ class MonthlyReportsTable
             ->defaultSort('month', 'desc')
             ->columns([
                 TextColumn::make('month')
+                    ->label(__('panel.resources.monthly_reports.month'))
                     ->date('F Y')
                     ->sortable(),
                 TextColumn::make('state')
+                    ->label(__('panel.common.status'))
                     ->badge()
                     ->color(fn (ReportState $state) => match ($state) {
                         ReportState::Draft => 'gray',
@@ -27,7 +29,7 @@ class MonthlyReportsTable
                         ReportState::SentToHr => 'success',
                     }),
                 TextColumn::make('teachers_count')
-                    ->label('Teachers')
+                    ->label(__('panel.common.teacher'))
                     // ->state(), not make('snapshot_json.teachers') — the
                     // latter resolves to an array (one entry per teacher),
                     // and TextColumn treats any array state as a *list* to
@@ -37,24 +39,26 @@ class MonthlyReportsTable
                     // of just formatting whatever it resolved to.
                     ->state(fn ($record) => count($record->snapshot_json['teachers'] ?? [])),
                 TextColumn::make('pending_count')
-                    ->label('Pending exceptions')
+                    ->label(__('panel.resources.monthly_reports.pending_exceptions'))
                     ->badge()
                     ->state(fn ($record) => $record->snapshot_json['totals']['pending'] ?? 0)
                     ->color(fn ($state) => $state > 0 ? 'danger' : 'success'),
                 TextColumn::make('generated_at')
+                    ->label(__('panel.resources.monthly_reports.generated_at'))
                     ->dateTime()
-                    ->placeholder('Not yet generated')
+                    ->placeholder(__('panel.resources.monthly_reports.not_generated'))
                     ->sortable(),
                 TextColumn::make('approvedBy.name')
-                    ->label('Approved by')
-                    ->placeholder('—'),
+                    ->label(__('panel.common.approved_by'))
+                    ->placeholder(__('panel.common.dash_placeholder')),
                 TextColumn::make('sent_to_hr_at')
+                    ->label(__('panel.resources.monthly_reports.sent_to_hr'))
                     ->dateTime()
-                    ->placeholder('—'),
+                    ->placeholder(__('panel.common.dash_placeholder')),
             ])
             ->recordActions([
                 Action::make('view')
-                    ->label('View')
+                    ->label(__('panel.common.view'))
                     ->url(fn ($record) => MonthlyReportResource::getUrl('view', ['record' => $record])),
             ]);
     }

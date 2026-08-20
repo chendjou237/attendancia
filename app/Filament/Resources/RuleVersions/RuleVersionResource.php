@@ -60,4 +60,14 @@ class RuleVersionResource extends Resource
     {
         return auth()->user()?->hasRole('admin') ?? false;
     }
+
+    public static function getModelLabel(): string
+    {
+        return __('panel.nav.rule_versions.singular');
+    }
+
+    public static function getPluralModelLabel(): string
+    {
+        return __('panel.nav.rule_versions.plural');
+    }
 }

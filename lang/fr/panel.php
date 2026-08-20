@@ -11,6 +11,7 @@ return [
         'created_at' => 'Créé le',
         'updated_at' => 'Mis à jour le',
         'date' => 'Date',
+        'day' => 'Jour',
         'note' => 'Remarque',
         'language' => 'Langue',
         'teacher' => 'Enseignant',
@@ -72,8 +73,168 @@ return [
         'teacher_attendance' => 'Présences des enseignants',
     ],
 
-    'resources' => [],
-    'pages' => [],
+    'resources' => [
+
+        'period_slots' => [
+            'sequence' => 'Séquence',
+            'sequence_help' => "Ordre dans la journée (1, 2, 3…) — détermine la position dans la grille horaire.",
+            'seq' => 'Séq.',
+            'is_break' => 'Récréation / pause déjeuner',
+            'is_break_short' => 'Pause',
+            'open_ended' => 'Sans fin définie',
+            'current_only' => 'Version actuelle uniquement',
+        ],
+
+        'notices' => [
+            'types' => [
+                'sick_leave' => 'Congé maladie',
+                'official_mission' => 'Mission officielle',
+                'bereavement' => 'Deuil',
+                'other' => 'Autre',
+            ],
+            'type' => 'Type',
+            'reference' => 'Référence',
+            'reference_help' => "Référence papier enregistrée par l'agent, par ex. le numéro d'un certificat médical.",
+            'attachment_path' => 'Chemin de la pièce jointe',
+            'attachment_path_help' => "Pas encore de gestion de téléversement — un chemin ou une référence vers une copie scannée, si elle existe.",
+        ],
+
+        'class_codes' => [
+            'name_fr' => 'Nom (français)',
+        ],
+
+        'devices' => [
+            'firmware' => 'Micrologiciel',
+            'last_seen_at' => 'Dernière activité',
+            'last_seen_at_help' => "Écrit par le processus d'ingestion — non modifiable ici.",
+            'clock_offset' => "Décalage d'horloge",
+            'clock_offset_help' => "Décalage d'horloge entre l'appareil et le serveur, écrit par le processus d'ingestion.",
+        ],
+
+        'audit_logs' => [
+            'entity' => 'Entité',
+            'entity_id' => "ID de l'entité",
+            'action' => 'Action',
+            'actor' => 'Auteur',
+            'system' => 'Système',
+        ],
+
+        'calendar_days' => [
+            'day_type' => 'Type de jour',
+            'half_day_cutoff' => 'Limite de demi-journée (dernier créneau compté)',
+            'slot_option' => ':day, période :period (:start–:end)',
+            'scoped_to' => 'Limité à',
+            'suspended_help' => "Laisser vide pour suspendre tout l'établissement. Sélectionner des classes précises pour une suspension partielle (par ex. une séquence d'examen pour un seul niveau).",
+            'whole_school' => "Tout l'établissement",
+            'marked_at' => 'Marqué le',
+        ],
+
+        'teacher_biometric_ids' => [
+            'biometric_id' => 'Identifiant biométrique (employeeNoString)',
+            'biometric_id_help' => "L'identifiant côté appareil — à confirmer avec un vrai pointage avant utilisation (§13.5).",
+            'valid_to_help' => "Laisser vide pour une association active. Attribuer cet identifiant à un autre enseignant clôture automatiquement celle-ci.",
+            'active_placeholder' => 'Actif',
+        ],
+
+        'rule_versions' => [
+            'grace_late' => 'Tolérance (retard)',
+            'grace_early' => 'Tolérance (départ anticipé)',
+            'pair_window_before' => 'Fenêtre de pointage (avant)',
+            'pair_window_after' => 'Fenêtre de pointage (après)',
+            'debounce' => 'Anti-rebond',
+            'min_session' => 'Séance min.',
+            'hours_per_period' => 'Heures/période',
+            'valid_from_help' => "S'applique à partir de cette date. Les résultats déjà calculés avant cette date ne sont jamais réécrits.",
+            'note_help' => 'Pourquoi cette version existe — la direction le demandera, et vous ne vous en souviendrez plus.',
+        ],
+
+        'teachers' => [
+            'timetable_title' => 'Emploi du temps — :name',
+            'notification_version_created' => "Nouvelle version d'emploi du temps créée",
+            'notification_timetable_saved' => 'Emploi du temps enregistré',
+            'active_from' => 'Actif à partir du',
+            'active_to' => "Actif jusqu'au",
+            'timetable_action' => 'Emploi du temps',
+        ],
+
+        'users' => [
+            'email' => 'E-mail',
+            'password' => 'Mot de passe',
+            'password_help' => 'Laisser vide pour conserver le mot de passe actuel.',
+            'password_confirmation' => 'Confirmer le mot de passe',
+            'role' => 'Rôle',
+            'locale_help' => "Laisser vide pour suivre la langue par défaut du site / son propre choix via le sélecteur de langue.",
+        ],
+
+        'monthly_reports' => [
+            'month' => 'Mois',
+            'pending_exceptions' => 'Exceptions en attente',
+            'generated_at' => 'Généré le',
+            'not_generated' => 'Pas encore généré',
+            'sent_to_hr' => 'Envoyé aux RH',
+            'generate_action' => 'Générer le rapport',
+            'generate_help' => "N'importe quel jour du mois cible — seul le mois compte. Générer un rapport déjà en brouillon ou vérifié par l'agent le rafraîchit avec les dernières données ; un rapport déjà approuvé n'est pas modifié.",
+            'notification_ready' => 'Rapport de :month prêt',
+            'view_title' => 'Rapport mensuel — :month',
+            'regenerate_action' => 'Régénérer avec les dernières données',
+            'notification_refreshed' => 'Rapport actualisé avec les données actuelles',
+            'mark_reviewed_action' => 'Marquer comme vérifié',
+            'approve_action' => 'Approbation du proviseur',
+            'approve_modal_description' => "Ceci fige le rapport. Une fois approuvé, il ne peut plus être régénéré — une correction après ce point nécessite un ajustement manuel et audité, pas une nouvelle exécution du générateur.",
+            'send_to_hr_action' => 'Envoyer aux RH',
+            'notification_state_updated' => 'Statut du rapport mis à jour',
+        ],
+
+    ],
+
+    'pages' => [
+
+        'exception_queue' => [
+            'override_action' => 'Corriger',
+            'actual_status' => 'Statut réel',
+            'reason_help' => "Obligatoire — ceci devient partie de la piste d'audit (§9, §14).",
+            'notification_override_recorded' => 'Correction enregistrée',
+        ],
+
+        'device_monitor' => [
+            'online' => 'En ligne',
+            'silent' => 'Silencieux',
+            'offline' => 'Hors ligne',
+            'no_devices' => "Aucun appareil configuré pour l'instant — ajoutez-en un dans Appareils.",
+            'simulate_scan_heading' => 'Simuler un pointage',
+            'simulate_scan_body' => "Pas encore d'appareil sur place, ou envie de voir le flux ci-dessous bouger sans vous déplacer au couloir ? Choisissez un appareil et un enseignant inscrit puis déclenchez un vrai pointage via le même circuit qu'un terminal réel.",
+            'no_enrolled_teachers' => "Aucun enseignant n'a encore d'identifiant biométrique — ajoutez-en un dans Identifiants biométriques d'abord.",
+            'select_teacher_placeholder' => 'Sélectionner un enseignant…',
+            'simulate_scan_button' => 'Simuler le pointage',
+            'live_activity' => 'Activité en direct',
+            'updates_every_3s' => 'Mise à jour toutes les 3s',
+            'time' => 'Heure',
+            'result' => 'Résultat',
+            'unmatched' => 'Non identifié',
+            'passed' => 'Réussi',
+            'failed' => 'Échoué',
+            'other' => 'Autre',
+            'no_scans_yet' => "Aucun pointage pour l'instant — simulez-en un ci-dessus, ou attendez l'appareil réel.",
+            'notification_pick_device_teacher' => "Choisissez d'abord un appareil et un enseignant",
+            'notification_scan_recorded' => 'Pointage enregistré — :teacher sur :device',
+            'never_seen' => 'Jamais vu',
+            'last_seen' => 'Vu il y a __TIME__',
+            'ago_seconds' => 's',
+            'ago_minutes' => 'min',
+            'ago_hours' => 'h',
+            'ago_days' => 'j',
+        ],
+
+        'teacher_attendance' => [
+            'date_range' => 'Plage de dates',
+            'indicator_from' => 'Du :date',
+            'indicator_until' => "Jusqu'au :date",
+            'override_tooltip' => ':status — :reason (:actor, :at)',
+            'unknown_actor' => 'Inconnu',
+        ],
+
+    ],
+
     'widgets' => [],
     'pdf' => [],
 

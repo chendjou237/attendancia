@@ -12,8 +12,10 @@ class CorridorForm
         return $schema
             ->components([
                 TextInput::make('code')
+                    ->label(__('panel.common.code'))
                     ->required(),
                 TextInput::make('name')
+                    ->label(__('panel.common.name'))
                     ->required(),
             ]);
     }

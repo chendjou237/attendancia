@@ -52,4 +52,14 @@ class CorridorResource extends Resource
     {
         return auth()->user()?->hasRole('admin') ?? false;
     }
+
+    public static function getModelLabel(): string
+    {
+        return __('panel.nav.corridors.singular');
+    }
+
+    public static function getPluralModelLabel(): string
+    {
+        return __('panel.nav.corridors.plural');
+    }
 }

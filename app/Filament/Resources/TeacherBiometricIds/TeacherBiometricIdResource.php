@@ -50,4 +50,14 @@ class TeacherBiometricIdResource extends Resource
     {
         return auth()->user()?->hasAnyRole(['admin', 'officer']) ?? false;
     }
+
+    public static function getModelLabel(): string
+    {
+        return __('panel.nav.teacher_biometric_ids.singular');
+    }
+
+    public static function getPluralModelLabel(): string
+    {
+        return __('panel.nav.teacher_biometric_ids.plural');
+    }
 }

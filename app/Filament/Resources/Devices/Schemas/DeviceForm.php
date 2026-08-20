@@ -15,22 +15,29 @@ class DeviceForm
         return $schema
             ->components([
                 Select::make('corridor_id')
+                    ->label(__('panel.common.corridor'))
                     ->relationship('corridor', 'name')
                     ->required(),
                 TextInput::make('serial')
+                    ->label(__('panel.common.serial'))
                     ->required(),
-                TextInput::make('ip'),
+                TextInput::make('ip')
+                    ->label(__('panel.common.ip_address')),
                 Toggle::make('is_active')
+                    ->label(__('panel.common.active'))
                     ->required(),
-                TextInput::make('firmware'),
+                TextInput::make('firmware')
+                    ->label(__('panel.resources.devices.firmware')),
                 DateTimePicker::make('last_seen_at')
+                    ->label(__('panel.resources.devices.last_seen_at'))
                     ->disabled()
-                    ->helperText('Written by the ingestion worker — not editable here.'),
+                    ->helperText(__('panel.resources.devices.last_seen_at_help')),
                 TextInput::make('last_time_offset_seconds')
+                    ->label(__('panel.resources.devices.clock_offset'))
                     ->numeric()
                     ->disabled()
                     ->suffix('s')
-                    ->helperText('Device/server clock drift, written by the ingestion worker.'),
+                    ->helperText(__('panel.resources.devices.clock_offset_help')),
             ]);
     }
 }

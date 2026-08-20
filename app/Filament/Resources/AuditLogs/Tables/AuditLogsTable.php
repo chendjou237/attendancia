@@ -13,20 +13,24 @@ class AuditLogsTable
             ->defaultSort('at', 'desc')
             ->columns([
                 TextColumn::make('at')
+                    ->label(__('panel.common.date'))
                     ->dateTime()
                     ->sortable(),
                 TextColumn::make('entity')
+                    ->label(__('panel.resources.audit_logs.entity'))
                     ->searchable(),
                 TextColumn::make('entity_id')
+                    ->label(__('panel.resources.audit_logs.entity_id'))
                     ->numeric()
                     ->sortable(),
                 TextColumn::make('action')
+                    ->label(__('panel.resources.audit_logs.action'))
                     ->badge()
                     ->searchable(),
                 TextColumn::make('actor.name')
-                    ->label('Actor')
+                    ->label(__('panel.resources.audit_logs.actor'))
                     ->searchable()
-                    ->placeholder('System'),
+                    ->placeholder(__('panel.resources.audit_logs.system')),
             ])
             ->filters([
                 //

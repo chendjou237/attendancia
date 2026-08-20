@@ -19,22 +19,23 @@ class ListMonthlyReports extends ListRecords
     {
         return [
             Action::make('generate')
-                ->label('Generate report')
+                ->label(__('panel.resources.monthly_reports.generate_action'))
                 ->icon(Heroicon::OutlinedSparkles)
                 ->visible(fn () => auth()->user()?->hasAnyRole(['admin', 'officer']) ?? false)
                 ->schema([
                     DatePicker::make('month')
+                        ->label(__('panel.resources.monthly_reports.month'))
                         ->required()
                         ->default(now()->startOfMonth()->subMonthNoOverflow())
                         ->displayFormat('F Y')
                         ->closeOnDateSelection()
-                        ->helperText('Any day within the target month — only the month matters. Generating an existing Draft or Officer-reviewed report refreshes it from the latest data; an already-approved report is untouched.'),
+                        ->helperText(__('panel.resources.monthly_reports.generate_help')),
                 ])
                 ->action(function (array $data, MonthlyReportGenerator $generator): void {
                     $report = $generator->generate(Carbon::parse($data['month']));
 
                     Notification::make()
-                        ->title("Report for {$report->month->format('F Y')} ready")
+                        ->title(__('panel.resources.monthly_reports.notification_ready', ['month' => $report->month->translatedFormat('F Y')]))
                         ->success()
                         ->send();
                 }),

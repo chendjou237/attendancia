@@ -21,6 +21,7 @@ return [
         'created_at' => 'Created at',
         'updated_at' => 'Updated at',
         'date' => 'Date',
+        'day' => 'Day',
         'note' => 'Note',
         'language' => 'Language',
         'teacher' => 'Teacher',
@@ -81,7 +82,7 @@ return [
     |
     | Feeds getModelLabel()/getPluralModelLabel() on resources (which also
     | drives breadcrumbs and Create/Edit page titles, not just the sidebar)
-    | and getTitle()/navigationLabel on custom pages.
+    | and getTitle()/getNavigationLabel() on custom pages.
     |
     */
     'nav' => [
@@ -103,9 +104,168 @@ return [
         'teacher_attendance' => 'Teacher attendance',
     ],
 
-    // Populated resource-by-resource, page-by-page, as each file is touched.
-    'resources' => [],
-    'pages' => [],
+    'resources' => [
+
+        'period_slots' => [
+            'sequence' => 'Sequence',
+            'sequence_help' => 'Order within the day (1, 2, 3…) — determines position in the bell-schedule grid.',
+            'seq' => 'Seq',
+            'is_break' => 'Break / lunch period',
+            'is_break_short' => 'Break',
+            'open_ended' => 'Open-ended',
+            'current_only' => 'Current version only',
+        ],
+
+        'notices' => [
+            'types' => [
+                'sick_leave' => 'Sick leave',
+                'official_mission' => 'Official mission',
+                'bereavement' => 'Bereavement',
+                'other' => 'Other',
+            ],
+            'type' => 'Type',
+            'reference' => 'Reference',
+            'reference_help' => "Paper reference the officer is recording, e.g. a doctor's note number.",
+            'attachment_path' => 'Attachment path',
+            'attachment_path_help' => 'No upload handling yet — a path or reference to a scanned copy, if one exists.',
+        ],
+
+        'class_codes' => [
+            'name_fr' => 'Name (French)',
+        ],
+
+        'devices' => [
+            'firmware' => 'Firmware',
+            'last_seen_at' => 'Last seen at',
+            'last_seen_at_help' => 'Written by the ingestion worker — not editable here.',
+            'clock_offset' => 'Clock offset',
+            'clock_offset_help' => 'Device/server clock drift, written by the ingestion worker.',
+        ],
+
+        'audit_logs' => [
+            'entity' => 'Entity',
+            'entity_id' => 'Entity ID',
+            'action' => 'Action',
+            'actor' => 'Actor',
+            'system' => 'System',
+        ],
+
+        'calendar_days' => [
+            'day_type' => 'Day type',
+            'half_day_cutoff' => 'Half-day cutoff (last slot that still counts)',
+            'slot_option' => ':day, period :period (:start–:end)',
+            'scoped_to' => 'Scoped to',
+            'suspended_help' => 'Leave empty to suspend the whole school. Select specific classes for a partial suspension (e.g. one form sitting a sequence exam).',
+            'whole_school' => 'Whole school',
+            'marked_at' => 'Marked at',
+        ],
+
+        'teacher_biometric_ids' => [
+            'biometric_id' => 'Biometric ID (employeeNoString)',
+            'biometric_id_help' => 'The device-side id — confirm the exact field name and value against a real scan first (§13.5).',
+            'valid_to_help' => 'Leave empty for an active mapping. Assigning this id to a different teacher automatically closes this one out.',
+            'active_placeholder' => 'Active',
+        ],
+
+        'rule_versions' => [
+            'grace_late' => 'Grace (late)',
+            'grace_early' => 'Grace (early)',
+            'pair_window_before' => 'Pair window (before)',
+            'pair_window_after' => 'Pair window (after)',
+            'debounce' => 'Debounce',
+            'min_session' => 'Min. session',
+            'hours_per_period' => 'Hours/period',
+            'valid_from_help' => 'Applies to this date onward. Existing computed results before this date are never rewritten.',
+            'note_help' => 'Why this version exists — leadership will ask, and future-you will not remember.',
+        ],
+
+        'teachers' => [
+            'timetable_title' => 'Timetable — :name',
+            'notification_version_created' => 'New timetable version created',
+            'notification_timetable_saved' => 'Timetable saved',
+            'active_from' => 'Active from',
+            'active_to' => 'Active to',
+            'timetable_action' => 'Timetable',
+        ],
+
+        'users' => [
+            'email' => 'Email',
+            'password' => 'Password',
+            'password_help' => 'Leave blank to keep the current password.',
+            'password_confirmation' => 'Confirm password',
+            'role' => 'Role',
+            'locale_help' => 'Leave blank to follow the site default / their own language switcher choice.',
+        ],
+
+        'monthly_reports' => [
+            'month' => 'Month',
+            'pending_exceptions' => 'Pending exceptions',
+            'generated_at' => 'Generated at',
+            'not_generated' => 'Not yet generated',
+            'sent_to_hr' => 'Sent to HR',
+            'generate_action' => 'Generate report',
+            'generate_help' => 'Any day within the target month — only the month matters. Generating an existing Draft or Officer-reviewed report refreshes it from the latest data; an already-approved report is untouched.',
+            'notification_ready' => 'Report for :month ready',
+            'view_title' => 'Monthly report — :month',
+            'regenerate_action' => 'Regenerate from latest data',
+            'notification_refreshed' => 'Report refreshed from current data',
+            'mark_reviewed_action' => 'Mark reviewed',
+            'approve_action' => 'Principal approve',
+            'approve_modal_description' => 'This freezes the report. Once approved, it can no longer be regenerated — a correction after this point needs a manual, audited adjustment, not a re-run of the generator.',
+            'send_to_hr_action' => 'Send to HR',
+            'notification_state_updated' => 'Report state updated',
+        ],
+
+    ],
+
+    'pages' => [
+
+        'exception_queue' => [
+            'override_action' => 'Override',
+            'actual_status' => 'Actual status',
+            'reason_help' => 'Mandatory — this becomes part of the audit trail (§9, §14).',
+            'notification_override_recorded' => 'Override recorded',
+        ],
+
+        'device_monitor' => [
+            'online' => 'Online',
+            'silent' => 'Silent',
+            'offline' => 'Offline',
+            'no_devices' => 'No devices configured yet — add one under Devices.',
+            'simulate_scan_heading' => 'Simulate a scan',
+            'simulate_scan_body' => 'No device on site yet, or want to see the feed below move without walking to the corridor? Pick a device and an enrolled teacher and fire one real scan through the same pipeline a live terminal uses.',
+            'no_enrolled_teachers' => 'No teacher has a biometric ID enrolled yet — add one under Teacher Biometric IDs first.',
+            'select_teacher_placeholder' => 'Select a teacher…',
+            'simulate_scan_button' => 'Simulate scan',
+            'live_activity' => 'Live activity',
+            'updates_every_3s' => 'Updates every 3s',
+            'time' => 'Time',
+            'result' => 'Result',
+            'unmatched' => 'Unmatched',
+            'passed' => 'Passed',
+            'failed' => 'Failed',
+            'other' => 'Other',
+            'no_scans_yet' => 'No scans yet — simulate one above, or wait for the real device.',
+            'notification_pick_device_teacher' => 'Pick a device and a teacher first',
+            'notification_scan_recorded' => 'Scan recorded — :teacher on :device',
+            'never_seen' => 'Never seen',
+            'last_seen' => 'Last seen __TIME__',
+            'ago_seconds' => 's ago',
+            'ago_minutes' => 'm ago',
+            'ago_hours' => 'h ago',
+            'ago_days' => 'd ago',
+        ],
+
+        'teacher_attendance' => [
+            'date_range' => 'Date range',
+            'indicator_from' => 'From :date',
+            'indicator_until' => 'Until :date',
+            'override_tooltip' => ':status — :reason (:actor, :at)',
+            'unknown_actor' => 'Unknown',
+        ],
+
+    ],
+
     'widgets' => [],
     'pdf' => [],
 

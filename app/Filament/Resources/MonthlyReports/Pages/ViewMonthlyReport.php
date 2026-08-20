@@ -34,7 +34,7 @@ class ViewMonthlyReport extends Page
 
     public function getTitle(): string
     {
-        return 'Monthly report — '.$this->record->month->format('F Y');
+        return __('panel.resources.monthly_reports.view_title', ['month' => $this->record->month->translatedFormat('F Y')]);
     }
 
     protected function getHeaderActions(): array
@@ -43,7 +43,7 @@ class ViewMonthlyReport extends Page
 
         return [
             Action::make('downloadPdf')
-                ->label('Download PDF')
+                ->label(__('panel.common.download_pdf'))
                 ->icon(Heroicon::OutlinedArrowDownTray)
                 ->color('gray')
                 ->visible($this->record->snapshot_json !== null)
@@ -51,7 +51,7 @@ class ViewMonthlyReport extends Page
                 ->openUrlInNewTab(),
 
             Action::make('regenerate')
-                ->label('Regenerate from latest data')
+                ->label(__('panel.resources.monthly_reports.regenerate_action'))
                 ->icon(Heroicon::OutlinedArrowPath)
                 ->color('gray')
                 ->visible(in_array($state, [ReportState::Draft, ReportState::OfficerReviewed], true))
@@ -59,11 +59,11 @@ class ViewMonthlyReport extends Page
                     $generator->generate($this->record->month);
                     $this->record->refresh();
 
-                    Notification::make()->title('Report refreshed from current data')->success()->send();
+                    Notification::make()->title(__('panel.resources.monthly_reports.notification_refreshed'))->success()->send();
                 }),
 
             Action::make('markReviewed')
-                ->label('Mark reviewed')
+                ->label(__('panel.resources.monthly_reports.mark_reviewed_action'))
                 ->icon(Heroicon::OutlinedCheckBadge)
                 ->color('info')
                 ->requiresConfirmation()
@@ -73,11 +73,11 @@ class ViewMonthlyReport extends Page
                 }),
 
             Action::make('approve')
-                ->label('Principal approve')
+                ->label(__('panel.resources.monthly_reports.approve_action'))
                 ->icon(Heroicon::OutlinedCheckBadge)
                 ->color('warning')
                 ->requiresConfirmation()
-                ->modalDescription('This freezes the report. Once approved, it can no longer be regenerated — a correction after this point needs a manual, audited adjustment, not a re-run of the generator.')
+                ->modalDescription(__('panel.resources.monthly_reports.approve_modal_description'))
                 ->visible(fn () => $state === ReportState::OfficerReviewed && auth()->user()?->hasAnyRole(['principal', 'admin']))
                 ->action(function (): void {
                     $this->record->update(['approved_by' => auth()->id(), 'approved_at' => now()]);
@@ -85,7 +85,7 @@ class ViewMonthlyReport extends Page
                 }),
 
             Action::make('sendToHr')
-                ->label('Send to HR')
+                ->label(__('panel.resources.monthly_reports.send_to_hr_action'))
                 ->icon(Heroicon::OutlinedPaperAirplane)
                 ->color('success')
                 ->requiresConfirmation()
@@ -111,6 +111,6 @@ class ViewMonthlyReport extends Page
             after: $this->record->only(['state']),
         );
 
-        Notification::make()->title('Report state updated')->success()->send();
+        Notification::make()->title(__('panel.resources.monthly_reports.notification_state_updated'))->success()->send();
     }
 }

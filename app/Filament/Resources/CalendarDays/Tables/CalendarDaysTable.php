@@ -16,20 +16,24 @@ class CalendarDaysTable
             ->defaultSort('date', 'desc')
             ->columns([
                 TextColumn::make('date')
+                    ->label(__('panel.common.date'))
                     ->date()
                     ->sortable(),
                 TextColumn::make('day_type')
+                    ->label(__('panel.resources.calendar_days.day_type'))
                     ->badge()
                     ->searchable(),
                 TextColumn::make('suspendedClassCodes.code')
-                    ->label('Scoped to')
+                    ->label(__('panel.resources.calendar_days.scoped_to'))
                     ->badge()
-                    ->placeholder('Whole school'),
+                    ->placeholder(__('panel.resources.calendar_days.whole_school')),
                 TextColumn::make('note')
+                    ->label(__('panel.common.note'))
                     ->limit(40),
                 TextColumn::make('markedBy.name')
-                    ->label('Marked by'),
+                    ->label(__('panel.common.marked_by')),
                 TextColumn::make('marked_at')
+                    ->label(__('panel.resources.calendar_days.marked_at'))
                     ->dateTime()
                     ->sortable()
                     ->toggleable(isToggledHiddenByDefault: true),

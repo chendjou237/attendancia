@@ -15,17 +15,22 @@ class UsersTable
         return $table
             ->columns([
                 TextColumn::make('name')
+                    ->label(__('panel.common.name'))
                     ->searchable(),
                 TextColumn::make('email')
+                    ->label(__('panel.resources.users.email'))
                     ->searchable(),
                 TextColumn::make('roles.name')
-                    ->label('Role')
+                    ->label(__('panel.resources.users.role'))
+                    ->formatStateUsing(fn (?string $state): ?string => filled($state) ? __('attendance.roles.'.$state) : null)
                     ->badge(),
                 TextColumn::make('created_at')
+                    ->label(__('panel.common.created_at'))
                     ->dateTime()
                     ->sortable()
                     ->toggleable(isToggledHiddenByDefault: true),
                 TextColumn::make('updated_at')
+                    ->label(__('panel.common.updated_at'))
                     ->dateTime()
                     ->sortable()
                     ->toggleable(isToggledHiddenByDefault: true),

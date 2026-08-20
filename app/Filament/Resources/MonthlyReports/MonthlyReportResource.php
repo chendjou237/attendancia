@@ -66,4 +66,14 @@ class MonthlyReportResource extends Resource
     {
         return auth()->user()?->hasAnyRole(['admin', 'officer', 'principal', 'hr']) ?? false;
     }
+
+    public static function getModelLabel(): string
+    {
+        return __('panel.nav.monthly_reports.singular');
+    }
+
+    public static function getPluralModelLabel(): string
+    {
+        return __('panel.nav.monthly_reports.plural');
+    }
 }

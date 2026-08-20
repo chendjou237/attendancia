@@ -16,16 +16,25 @@ class NoticesTable
             ->defaultSort('created_at', 'desc')
             ->columns([
                 TextColumn::make('teacher.full_name')
-                    ->label('Teacher')
+                    ->label(__('panel.common.teacher'))
                     ->searchable(),
                 TextColumn::make('type')
+                    // Not translated here — see NoticeForm::types() and
+                    // the note in ClassCodeForm's neighbouring resources:
+                    // this column has no formatStateUsing at all today
+                    // (pre-existing, shows the raw 'sick_leave' value
+                    // regardless of locale) and fixing that is flagged as
+                    // a separate follow-up, not silently bundled in here.
+                    ->label(__('panel.resources.notices.type'))
                     ->badge()
                     ->searchable(),
                 TextColumn::make('reference')
+                    ->label(__('panel.resources.notices.reference'))
                     ->searchable(),
                 TextColumn::make('createdBy.name')
-                    ->label('Recorded by'),
+                    ->label(__('panel.common.recorded_by')),
                 TextColumn::make('created_at')
+                    ->label(__('panel.common.created_at'))
                     ->dateTime()
                     ->sortable(),
             ])
