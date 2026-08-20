@@ -396,10 +396,19 @@ device serial argument and log file.
 
 ---
 
-## 13. cron — the nightly backfill
+## 13. cron — the nightly backfill and recompute
 
-The nightly backfill (`routes/console.php`, `02:00` local time, one run per
-active device) is driven by Laravel's own scheduler, which needs exactly one
+At `02:00` local time, `routes/console.php` runs `NightlyRecovery`: a
+backfill for every active device, then `attendance:compute` for today and
+yesterday. Backfill alone only recovers `raw_events` — this second half is
+what turns a routine overnight outage into finished `period_results`
+without anyone having to notice the gap and re-run the engine by hand. A
+longer outage (more than a day) needs a human to run `attendance:compute
+--date=YYYY-MM-DD` for each earlier affected day once it's noticed, the
+same way it already needs `hikvision:backfill --hours=N` for a window
+longer than the default 48h.
+
+This is driven by Laravel's own scheduler, which needs exactly one
 crontab entry:
 
 ```bash
@@ -455,6 +464,12 @@ Work through this checklist once setup is complete:
    unattended, `hikvision-stream` comes back up on its own
    (`supervisorctl status`), and re-running `hikvision:dump` or checking
    `raw_events` shows no gap and no duplicated events for the outage window.
+   Recovering `raw_events` isn't the whole story, though — a scan for a
+   period that's already passed only becomes a `Present`/`Absent` result
+   once `attendance:compute` runs for that date. §13's nightly job does
+   that automatically for today/yesterday; to confirm the gap is actually
+   closed, don't just check `raw_events` — check that a `period_results`
+   row exists for the affected teacher and date too.
 
 If you don't have a device available yet to test any of this against, see
 `docs/onboarding.md`'s note on `demo:seed` — it exercises the full ingestion
