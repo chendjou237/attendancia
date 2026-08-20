@@ -38,6 +38,14 @@ class UserForm
                     ->multiple(false)
                     ->preload()
                     ->required(),
+                Select::make('locale')
+                    ->label(__('panel.common.language'))
+                    ->options([
+                        'fr' => 'Français',
+                        'en' => 'English',
+                    ])
+                    ->default('fr')
+                    ->helperText('Leave blank to follow the site default / their own language switcher choice.'),
             ]);
     }
 }

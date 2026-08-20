@@ -3,6 +3,9 @@
 namespace App\Providers\Filament;
 
 use App\Filament\Widgets\AttendanceOverview;
+use App\Http\Controllers\LocaleController;
+use App\Http\Middleware\SetLocale;
+use Filament\Actions\Action;
 use Filament\Http\Middleware\Authenticate;
 use Filament\Http\Middleware\AuthenticateSession;
 use Filament\Http\Middleware\DisableBladeIconComponents;
@@ -11,6 +14,7 @@ use Filament\Pages\Dashboard;
 use Filament\Panel;
 use Filament\PanelProvider;
 use Filament\Support\Colors\Color;
+use Filament\Support\Icons\Heroicon;
 use Filament\Widgets\AccountWidget;
 use Illuminate\Cookie\Middleware\AddQueuedCookiesToResponse;
 use Illuminate\Cookie\Middleware\EncryptCookies;
@@ -46,6 +50,12 @@ class AdminPanelProvider extends PanelProvider
                 AddQueuedCookiesToResponse::class,
                 StartSession::class,
                 AuthenticateSession::class,
+                // After AuthenticateSession (needs $request->user()) and
+                // StartSession (needs $request->session()) — Filament panel
+                // routes don't go through Laravel's `web` middleware group,
+                // so the global SetLocale registration in bootstrap/app.php
+                // never reaches /admin/* without this.
+                SetLocale::class,
                 ShareErrorsFromSession::class,
                 PreventRequestForgery::class,
                 SubstituteBindings::class,
@@ -54,6 +64,21 @@ class AdminPanelProvider extends PanelProvider
             ])
             ->authMiddleware([
                 Authenticate::class,
+            ])
+            ->userMenuItems([
+                // Shows only "switch to the other language" — the active
+                // one hides itself, so there's never a redundant "you are
+                // here" item for a 2-locale toggle.
+                Action::make('locale-fr')
+                    ->label('Français')
+                    ->icon(Heroicon::OutlinedLanguage)
+                    ->url(fn () => route('locale.switch', 'fr'))
+                    ->visible(fn () => app()->getLocale() !== 'fr'),
+                Action::make('locale-en')
+                    ->label('English')
+                    ->icon(Heroicon::OutlinedLanguage)
+                    ->url(fn () => route('locale.switch', 'en'))
+                    ->visible(fn () => app()->getLocale() !== 'en'),
             ]);
     }
 }
