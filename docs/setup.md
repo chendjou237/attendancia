@@ -30,10 +30,13 @@ MySQL up  →  backfill runs  →  live stream starts
 
 `hikvision:stream` already does this itself (it runs a backfill before it
 opens the live connection, unless you pass `--skip-backfill`), so as long as
-Supervisor is configured to start it on boot (§7 below), the ordering is
-correct without anything extra. The one thing you must get right is that MySQL
-is actually up and accepting connections before Supervisor starts the stream
-worker — see §7.
+Supervisor is configured to start it on boot (§12 below), the ordering is
+correct without anything extra. The one part that used to require getting
+something right by hand — MySQL actually being up and accepting connections
+before Supervisor starts the stream worker — is now automatic:
+`deploy/scripts/wait-for-mysql.sh` polls the database before the worker
+starts (see §12), so there's nothing left to configure for this beyond
+following §7 and §12 as written.
 
 Because there's no UPS, a power cut can kill the server mid-write. MySQL's
 InnoDB storage engine is crash-safe, so the database itself won't corrupt; at
@@ -212,9 +215,29 @@ php artisan migrate --force
 php artisan db:seed --class=RoleSeeder
 ```
 
-Configure MySQL to start on boot (`systemctl enable mysql`) — this is the
-first link in the boot-order chain from §1, and it must come up before
-Supervisor's `hikvision-stream` program does.
+Install the durability config that pins MySQL's crash-safety settings
+explicitly rather than relying on them silently being the defaults (see
+`deploy/mysql/attendancia.cnf` for why — the short version: no UPS means a
+committed write must survive a power cut, and a generic "performance
+tuning" guide run against this server later would otherwise be the most
+likely thing to break that):
+
+```bash
+sudo cp deploy/mysql/attendancia.cnf /etc/mysql/mysql.conf.d/attendancia.cnf
+sudo systemctl restart mysql
+mysql -u attendancia -p -e "SHOW VARIABLES LIKE 'innodb_flush_log_at_trx_commit';"
+# expect the value column to read 1
+```
+
+(If your distro's MySQL/MariaDB package uses a different drop-in directory
+than `/etc/mysql/mysql.conf.d/`, put it wherever that install's own `my.cnf`
+`!includedir` line points instead.)
+
+Configure MySQL to start on boot:
+
+```bash
+sudo systemctl enable mysql
+```
 
 ---
 
@@ -373,18 +396,36 @@ by `staff_no` and will reject rows for anyone not yet in the system.
 
 ## 12. Supervisor — keep the live stream running
 
+First, make sure the `deploy/scripts/wait-for-mysql.sh` guard is executable
+— the Supervisor command below runs it before starting the stream worker:
+
+```bash
+chmod +x deploy/scripts/wait-for-mysql.sh
+```
+
 Copy the provided config and point it at your actual PHP 8.3+ binary and app
 path:
 
 ```bash
 sudo cp deploy/supervisor/hikvision-stream.conf /etc/supervisor/conf.d/
 sudo $EDITOR /etc/supervisor/conf.d/hikvision-stream.conf
-# update the `command=` line's php path and the device serial argument,
-# and the `directory=` line, to match this server
+# update the `command=` line's php path, app path (appears three times:
+# the wait-for-mysql.sh path, the artisan path, and the device serial
+# argument), and the `directory=` line, to match this server
+sudo systemctl enable supervisor
 sudo supervisorctl reread
 sudo supervisorctl update
 sudo supervisorctl status hikvision-stream
 ```
+
+The config's `command=` line runs `wait-for-mysql.sh` before it execs into
+`hikvision:stream` — this is what makes §1's boot order (MySQL up → backfill
+→ live stream) hold automatically, without you having to reason about
+whether `systemctl enable mysql` and Supervisor's own autostart happen to
+race each other on a given boot. If MySQL is still doing InnoDB crash
+recovery from the last power cut, the worker's log will show a heartbeat
+line every ~15s until it's ready, instead of the stream worker crash-looping
+against a database that isn't accepting connections yet.
 
 The config already has `startretries=999` and `autorestart=true` — an
 offline device is retried forever rather than giving up, which is the
@@ -474,6 +515,12 @@ Work through this checklist once setup is complete:
    that automatically for today/yesterday; to confirm the gap is actually
    closed, don't just check `raw_events` — check that a `period_results`
    row exists for the affected teacher and date too.
+   While it's coming back up, check
+   `tail -f /var/log/hikvision-stream.log` — you should see
+   `wait-for-mysql` heartbeat lines (§12) while MySQL is still recovering,
+   then a single "MySQL is up" line, then the worker's own startup output.
+   Repeated crash/restart cycles instead of clean heartbeats means the
+   boot-order fix isn't actually wired up — check §16.
 
 If you don't have a device available yet to test any of this against, see
 `docs/onboarding.md`'s note on `demo:seed` — it exercises the full ingestion
@@ -504,3 +551,19 @@ sanity-checking the *app* independently of whether the device is reachable.
   re-enrolled on the device needs a new mapping row here (closing out the old
   one), otherwise the old id keeps pointing at them and the new one resolves
   to nobody.
+- **`hikvision-stream.log` shows repeated `wait-for-mysql: still waiting...`
+  heartbeats that never resolve** — don't wait for Supervisor to eventually
+  show `FATAL` as your signal that something's actually wrong; with
+  `startretries=999` and each attempt free to poll for up to
+  `WAIT_FOR_MYSQL_TIMEOUT` (default 300s) before failing, reaching `FATAL`
+  this way could take a very long time if MySQL never comes back. Use the
+  heartbeat count instead: a few minutes of heartbeats right after a boot
+  that followed a long outage is normal (InnoDB crash recovery genuinely
+  takes longer the more was in-flight when power was lost) — but if it's
+  still polling well past that, treat it as a real fault. Check
+  `systemctl status mysql` first (it may have failed to start at all, not
+  just be slow), then confirm `DB_HOST`/`DB_PORT`/`DB_USERNAME`/
+  `DB_PASSWORD` in `.env` are still correct, then once MySQL is confirmed
+  reachable (`mysqladmin ping -h ... -u ... -p...`) run
+  `sudo supervisorctl restart hikvision-stream` to pick it up immediately
+  rather than waiting on Supervisor's own retry timing.
