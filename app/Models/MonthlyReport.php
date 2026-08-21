@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Casts\DateOnly;
 use App\Enums\ReportState;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -16,7 +17,7 @@ class MonthlyReport extends Model
     protected function casts(): array
     {
         return [
-            'month' => 'date',
+            'month' => DateOnly::class,
             'state' => ReportState::class,
             'snapshot_json' => 'array',
             'generated_at' => 'datetime',

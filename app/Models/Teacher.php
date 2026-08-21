@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Casts\DateOnly;
 use App\Enums\EmploymentType;
 use Carbon\CarbonInterface;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
@@ -18,8 +19,8 @@ class Teacher extends Model
     {
         return [
             'employment_type' => EmploymentType::class,
-            'active_from' => 'date',
-            'active_to' => 'date',
+            'active_from' => DateOnly::class,
+            'active_to' => DateOnly::class,
         ];
     }
 
@@ -49,16 +50,12 @@ class Teacher extends Model
      */
     public function timetableVersionFor(CarbonInterface $date): ?TimetableVersion
     {
-        // whereDate(), not where('valid_from', '<=', ...): the `date` cast
-        // serialises to "Y-m-d H:i:s" on save, so a plain string <=/>=
-        // comparison silently excludes a row whose valid_from is the exact
-        // reference day (fine on MySQL's real DATE type, which discards
-        // the time part on write, but wrong on any DB that stores dates
-        // as text). whereDate() compares on the date part only, correctly
-        // on both.
+        // Plain <=/>= comparisons are safe because App\Casts\DateOnly
+        // stores these columns as bare "Y-m-d" on every engine — see that
+        // cast for why this used to need whereDate() and what it cost.
         return $this->timetableVersions()
-            ->whereDate('valid_from', '<=', $date->toDateString())
-            ->where(fn ($q) => $q->whereNull('valid_to')->orWhereDate('valid_to', '>=', $date->toDateString()))
+            ->where('valid_from', '<=', $date->toDateString())
+            ->where(fn ($q) => $q->whereNull('valid_to')->orWhere('valid_to', '>=', $date->toDateString()))
             ->orderByDesc('valid_from')
             ->first();
     }

@@ -52,7 +52,7 @@ class DayResolver
 
     public function resolve(Teacher $teacher, CarbonInterface $date, RuleVersion $rule): void
     {
-        $calendarDay = CalendarDay::query()->whereDate('date', $date->toDateString())->first();
+        $calendarDay = CalendarDay::query()->where('date', $date->toDateString())->first();
         $dayType = $calendarDay?->day_type ?? DayType::Teaching;
 
         if ($dayType->hasNoExpectedSessions()) {
@@ -106,7 +106,7 @@ class DayResolver
     {
         PeriodResult::query()
             ->where('teacher_id', $teacher->id)
-            ->whereDate('date', $date->toDateString())
+            ->where('date', $date->toDateString())
             ->where('is_current', true)
             ->update(['is_current' => false]);
     }

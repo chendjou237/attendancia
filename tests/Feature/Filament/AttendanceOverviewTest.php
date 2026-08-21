@@ -101,3 +101,13 @@ it('shows "Not generated" when the current month has no report yet', function ()
 
     expect($stats[5]->getValue())->toBe('Not generated');
 });
+
+// Filament's CanPoll trait defaults to 5s. These are month-to-date
+// figures that move a few times a day, and refreshing them twelve times
+// a minute re-ran the month's aggregation each time, on a server also
+// running MySQL and the stream worker.
+it('polls at a minute rather than the framework default of five seconds', function () {
+    $overview = new AttendanceOverview;
+
+    expect((fn () => $this->getPollingInterval())->call($overview))->toBe('60s');
+});

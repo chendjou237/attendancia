@@ -121,14 +121,11 @@ class ManageTimetable extends Page
         // Not PeriodSlot::forDate() — that resolves one date's own
         // day-of-week; here every day of the week needs its own slots for
         // the same reference date, so the day is a loop variable instead.
-        // whereDate(), not a plain <=/>= comparison — see
-        // Teacher::timetableVersionFor() for why the latter would
-        // silently exclude a slot whose valid_from is the reference day.
         foreach (self::DAYS as $day) {
             $slots = PeriodSlot::query()
                 ->where('day_of_week', $day)
-                ->whereDate('valid_from', '<=', $referenceDate->toDateString())
-                ->where(fn ($q) => $q->whereNull('valid_to')->orWhereDate('valid_to', '>=', $referenceDate->toDateString()))
+                ->where('valid_from', '<=', $referenceDate->toDateString())
+                ->where(fn ($q) => $q->whereNull('valid_to')->orWhere('valid_to', '>=', $referenceDate->toDateString()))
                 ->orderBy('seq')
                 ->get();
 

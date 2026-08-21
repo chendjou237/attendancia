@@ -169,18 +169,18 @@ class TeacherAttendance extends Page implements HasTable
                                 // raw filter value: the DatePicker's state
                                 // comes back as a full datetime string
                                 // ("2026-08-20 21:58:24") even though only a
-                                // date was ever entered. whereDate() compares
-                                // its column-side date() extraction against
-                                // the value AS GIVEN — a bare date string
-                                // against a full datetime string is a losing
-                                // string comparison ("2026-08-20" < "2026-08-20 21:58:24"),
-                                // so every row silently vanishes unless the
-                                // value side is normalised to match.
-                                fn (Builder $query, $date): Builder => $query->whereDate('date', '>=', Carbon::parse($date)->toDateString()),
+                                // date was ever entered. The column holds a
+                                // bare "Y-m-d" (App\Casts\DateOnly), and
+                                // comparing that against a full datetime
+                                // string is a losing comparison
+                                // ("2026-08-20" < "2026-08-20 21:58:24"), so
+                                // every row silently vanishes unless the value
+                                // side is normalised to match.
+                                fn (Builder $query, $date): Builder => $query->where('date', '>=', Carbon::parse($date)->toDateString()),
                             )
                             ->when(
                                 $data['to'] ?? null,
-                                fn (Builder $query, $date): Builder => $query->whereDate('date', '<=', Carbon::parse($date)->toDateString()),
+                                fn (Builder $query, $date): Builder => $query->where('date', '<=', Carbon::parse($date)->toDateString()),
                             );
                     })
                     ->indicateUsing(function (array $data): array {

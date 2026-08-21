@@ -18,6 +18,10 @@
         </include>
     </source>
     <php>
+        <!-- The PDF export tests render real documents through dompdf,
+             which is memory-hungry; the whole suite in one process runs
+             past PHP's 128M default. -->
+        <ini name="memory_limit" value="512M"/>
         <env name="APP_ENV" value="testing"/>
         <env name="APP_LOCALE" value="en"/>
         <env name="APP_MAINTENANCE_DRIVER" value="file"/>

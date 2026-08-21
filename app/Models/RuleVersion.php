@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Casts\DateOnly;
 use Carbon\CarbonInterface;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -22,7 +23,7 @@ class RuleVersion extends Model
     {
         return [
             'hours_per_period' => 'decimal:2',
-            'valid_from' => 'date',
+            'valid_from' => DateOnly::class,
         ];
     }
 
@@ -38,11 +39,8 @@ class RuleVersion extends Model
      */
     public static function forDate(CarbonInterface $date): ?self
     {
-        // whereDate() — see Teacher::timetableVersionFor() for why a
-        // plain <= string comparison would silently exclude a version
-        // whose valid_from is the exact reference day.
         return static::query()
-            ->whereDate('valid_from', '<=', $date->toDateString())
+            ->where('valid_from', '<=', $date->toDateString())
             ->orderByDesc('valid_from')
             ->first();
     }

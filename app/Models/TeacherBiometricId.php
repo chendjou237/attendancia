@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Casts\DateOnly;
 use Carbon\CarbonInterface;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -16,8 +17,8 @@ class TeacherBiometricId extends Model
     protected function casts(): array
     {
         return [
-            'valid_from' => 'date',
-            'valid_to' => 'date',
+            'valid_from' => DateOnly::class,
+            'valid_to' => DateOnly::class,
         ];
     }
 
@@ -36,8 +37,8 @@ class TeacherBiometricId extends Model
     {
         $mapping = static::query()
             ->where('biometric_id', $biometricId)
-            ->whereDate('valid_from', '<=', $at->toDateString())
-            ->where(fn ($q) => $q->whereNull('valid_to')->orWhereDate('valid_to', '>=', $at->toDateString()))
+            ->where('valid_from', '<=', $at->toDateString())
+            ->where(fn ($q) => $q->whereNull('valid_to')->orWhere('valid_to', '>=', $at->toDateString()))
             ->orderByDesc('valid_from')
             ->first();
 

@@ -5,6 +5,7 @@ use App\Filament\Resources\PeriodSlots\Pages\EditPeriodSlot;
 use App\Filament\Resources\PeriodSlots\Pages\ListPeriodSlots;
 use App\Models\PeriodSlot;
 use App\Models\User;
+use Carbon\Carbon;
 use Database\Seeders\RoleSeeder;
 use Livewire\Livewire;
 
@@ -116,4 +117,26 @@ it('sorts the default list by day of week then sequence, matching the bell-sched
 
     Livewire::test(ListPeriodSlots::class)
         ->assertCanSeeTableRecords([$mondayOne, $mondayTwo, $tuesdayOne], inOrder: true);
+});
+
+// The current-only filter compares valid_to against a Carbon now(),
+// not a date string — so the column's "Y-m-d" is matched against a
+// "Y-m-d H:i:s" value. Without normalising the value side that is a
+// losing string comparison ('2026-09-01' >= '2026-09-01 14:30:00' is
+// false), which would hide a bell schedule on its own final day —
+// exactly the day it still governs.
+it('keeps a version whose valid_to is today visible under the current-only filter', function () {
+    Carbon::setTestNow('2026-09-01 14:30:00');
+
+    $expiringToday = PeriodSlot::factory()->create([
+        'day_of_week' => 1,
+        'seq' => 1,
+        'valid_from' => '2026-08-01',
+        'valid_to' => '2026-09-01',
+    ]);
+
+    Livewire::test(ListPeriodSlots::class)
+        ->assertCanSeeTableRecords([$expiringToday]);
+
+    Carbon::setTestNow();
 });

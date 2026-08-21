@@ -45,17 +45,17 @@ class PeriodResultWriter
         return DB::transaction(function () use ($teacher, $date, $slot, $classCode, $status, $source, $rule, $session) {
             PeriodResult::query()
                 ->where('teacher_id', $teacher->id)
-                ->whereDate('date', $date->toDateString())
+                ->where('date', $date->toDateString())
                 ->where('slot_id', $slot->id)
                 ->where('rule_version_id', '!=', $rule->id)
                 ->update(['is_current' => false]);
 
-            // Not firstOrNew(['date' => ...]) — see SessionBuilder::persist()
-            // for why a raw "Y-m-d" lookup value can silently fail to match
-            // an already-saved row once the `date` cast has serialised it.
+            // The natural key spelled out explicitly rather than via
+            // firstOrNew() — it is the row identity the whole versioning
+            // contract above rests on, and worth reading at a glance.
             $result = PeriodResult::query()
                 ->where('teacher_id', $teacher->id)
-                ->whereDate('date', $date->toDateString())
+                ->where('date', $date->toDateString())
                 ->where('slot_id', $slot->id)
                 ->where('rule_version_id', $rule->id)
                 ->first() ?? new PeriodResult([

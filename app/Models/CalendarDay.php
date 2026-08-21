@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Casts\DateOnly;
 use App\Enums\DayType;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -17,7 +18,7 @@ class CalendarDay extends Model
     protected function casts(): array
     {
         return [
-            'date' => 'date',
+            'date' => DateOnly::class,
             'day_type' => DayType::class,
             'marked_at' => 'datetime',
         ];

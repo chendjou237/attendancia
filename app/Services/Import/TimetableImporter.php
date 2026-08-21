@@ -146,8 +146,8 @@ class TimetableImporter
             $slot = PeriodSlot::query()
                 ->where('day_of_week', $dayOfWeek)
                 ->where('seq', $seq)
-                ->whereDate('valid_from', '<=', $validFrom->toDateString())
-                ->where(fn ($q) => $q->whereNull('valid_to')->orWhereDate('valid_to', '>=', $validFrom->toDateString()))
+                ->where('valid_from', '<=', $validFrom->toDateString())
+                ->where(fn ($q) => $q->whereNull('valid_to')->orWhere('valid_to', '>=', $validFrom->toDateString()))
                 ->first();
 
             if ($slot === null) {
@@ -191,15 +191,12 @@ class TimetableImporter
             foreach ($byVersion as $rows) {
                 $first = $rows[0];
 
-                // Not firstOrCreate(['valid_from' => ...]): the `date`
-                // cast serialises to "Y-m-d H:i:s" on save, so a raw
-                // "Y-m-d" lookup value can silently fail to match an
-                // already-saved row (see SessionBuilder::persist() and
-                // PeriodResultWriter for the full explanation — same
-                // trap, third time today).
+                // Looked up explicitly rather than via firstOrCreate() so
+                // the (teacher, valid_from) identity this REPLACE hinges on
+                // is visible here.
                 $version = TimetableVersion::query()
                     ->where('teacher_id', $first['teacher_id'])
-                    ->whereDate('valid_from', $first['valid_from'])
+                    ->where('valid_from', $first['valid_from'])
                     ->first();
 
                 if ($version === null) {

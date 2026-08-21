@@ -42,14 +42,11 @@ class ComputeAttendance extends Command
 
         $staffNos = $this->option('teacher');
 
-        // whereDate() — a plain <= string comparison would silently
-        // exclude a teacher whose active_from is the exact reference day
-        // (see Teacher::timetableVersionFor() for the full explanation).
         $teachers = Teacher::query()
             ->when($staffNos, fn ($q) => $q->whereIn('staff_no', $staffNos))
             ->when(! $staffNos, fn ($q) => $q
-                ->whereDate('active_from', '<=', $date->toDateString())
-                ->where(fn ($q) => $q->whereNull('active_to')->orWhereDate('active_to', '>=', $date->toDateString())))
+                ->where('active_from', '<=', $date->toDateString())
+                ->where(fn ($q) => $q->whereNull('active_to')->orWhere('active_to', '>=', $date->toDateString())))
             ->get();
 
         if ($teachers->isEmpty()) {

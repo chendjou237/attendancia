@@ -1,58 +1,115 @@
-<p align="center"><a href="https://laravel.com" target="_blank"><img src="https://raw.githubusercontent.com/laravel/art/master/logo-lockup/5%20SVG/2%20CMYK/1%20Full%20Color/laravel-logolockup-cmyk-red.svg" width="400" alt="Laravel Logo"></a></p>
+# Attendancia
 
-<p align="center">
-<a href="https://github.com/laravel/framework/actions"><img src="https://github.com/laravel/framework/workflows/tests/badge.svg" alt="Build Status"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/dt/laravel/framework" alt="Total Downloads"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/v/laravel/framework" alt="Latest Stable Version"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/l/laravel/framework" alt="License"></a>
-</p>
+Teacher attendance and payroll-hours tracking for a secondary school, built
+around Hikvision fingerprint terminals.
 
-## About Laravel
+A terminal sits in each corridor. A teacher scans at the start and end of a
+lesson; the system pairs those two scans against the teacher's timetable and
+decides, period by period, whether the lesson was actually taught. At month end
+the totals become payable hours for hourly-paid staff and an oversight view of
+everyone else.
 
-Laravel is a web application framework with expressive, elegant syntax. We believe development must be an enjoyable and creative experience to be truly fulfilling. Laravel takes the pain out of development by easing common tasks used in many web projects, such as:
+**The system never guesses.** A scan that doesn't resolve cleanly to Present or
+Absent becomes a *pending* result and goes to a human in the Exception queue. It
+is a payroll input, so an ambiguous case is escalated, never quietly decided.
 
-- [Simple, fast routing engine](https://laravel.com/docs/routing).
-- [Powerful dependency injection container](https://laravel.com/docs/container).
-- Multiple back-ends for [session](https://laravel.com/docs/session) and [cache](https://laravel.com/docs/cache) storage.
-- Expressive, intuitive [database ORM](https://laravel.com/docs/eloquent).
-- Database agnostic [schema migrations](https://laravel.com/docs/migrations).
-- [Robust background job processing](https://laravel.com/docs/queues).
-- [Real-time event broadcasting](https://laravel.com/docs/broadcasting).
+## How it fits together
 
-Laravel is accessible, powerful, and provides tools required for large, robust applications.
-
-## Learning Laravel
-
-Laravel has the most extensive and thorough [documentation](https://laravel.com/docs) and video tutorial library of all modern web application frameworks, making it a breeze to get started with the framework.
-
-In addition, [Laracasts](https://laracasts.com) contains thousands of video tutorials on a range of topics including Laravel, modern PHP, unit testing, and JavaScript. Boost your skills by digging into our comprehensive video library.
-
-You can also watch bite-sized lessons with real-world projects on [Laravel Learn](https://laravel.com/learn), where you will be guided through building a Laravel application from scratch while learning PHP fundamentals.
-
-## Agentic Development
-
-Laravel's predictable structure and conventions make it ideal for AI coding agents like Claude Code, Cursor, and GitHub Copilot. Install [Laravel Boost](https://laravel.com/docs/ai) to supercharge your AI workflow:
-
-```bash
-composer require laravel/boost --dev
-
-php artisan boost:install
+```
+Hikvision terminal
+  │  live alertStream (hikvision:stream, kept up by Supervisor)
+  │  AcsEvent replay  (hikvision:backfill, on worker boot + nightly)
+  ▼
+raw_events ──────────── append-only; no updates, no deletes, ever
+  │
+  │  attendance:compute
+  ▼
+DayResolver → SessionBuilder → PairingEngine → RuleEngine → PeriodResultWriter
+  │           group periods    match scans     grace-window   supersede, never
+  │           into sessions    to a session    verdict        overwrite
+  ▼
+period_results ──────── one row per teacher, per date, per period
+  │
+  ▼
+Monthly report → Officer review → Principal approval → HR
 ```
 
-Boost provides your agent 15+ tools and skills that help agents build Laravel applications while following best practices.
+Both ingestion paths converge on a single `EventProcessor`, so the live stream
+and a backfill cannot drift apart. Everything downstream is idempotent:
+recomputing a date whose inputs haven't changed reproduces identical rows.
 
-## Contributing
+### The rules that shape the schema
 
-Thank you for considering contributing to the Laravel framework! The contribution guide can be found in the [Laravel documentation](https://laravel.com/docs/contributions).
+- **Nothing is overwritten.** Rule versions, timetables, bell schedules and
+  biometric enrolments are all versioned by `valid_from`; period results
+  supersede via `is_current` rather than being updated in place. An October
+  correction never rewrites September's pay.
+- **`raw_events` is append-only.** It is the evidence trail behind every number.
+- **Approved reports are frozen.** Once a month is Principal-approved,
+  regenerating it is refused rather than silently redone.
+- **Every human override is audited** — actor, timestamp, before, after, and a
+  mandatory reason.
 
-## Code of Conduct
+## Running it locally
 
-In order to ensure that the Laravel community is welcoming to all, please review and abide by the [Code of Conduct](https://laravel.com/docs/contributions#code-of-conduct).
+Requires PHP 8.3+, MySQL 8 (or MariaDB 10.6+), and Node.
 
-## Security Vulnerabilities
+```bash
+composer setup
+```
 
-If you discover a security vulnerability within Laravel, please send an e-mail to Taylor Otwell via [taylor@laravel.com](mailto:taylor@laravel.com). All security vulnerabilities will be promptly addressed.
+Then seed a full, coherent demo dataset — reference data, two months of
+simulated attendance run through the real ingestion pipeline, and generated
+reports — so every screen has real engine-computed content without a device:
 
-## License
+```bash
+php artisan demo:seed --fresh
+```
 
-The Laravel framework is open-sourced software licensed under the [MIT license](https://opensource.org/licenses/MIT).
+Start the dev server and sign in at `/admin`:
+
+```bash
+composer dev
+```
+
+The panel is in **French** by default; switch to English from the user menu.
+
+## Tests
+
+```bash
+php artisan test
+```
+
+The suite runs against in-memory SQLite. Production is MySQL — see
+`app/Casts/DateOnly.php` for the one place that difference is deliberately
+neutralised, and `tests/Feature/DateRangeBoundaryTest.php` for the regressions
+that hold it down.
+
+## Commands
+
+| Command | What it does |
+|---|---|
+| `attendance:compute {date?}` | Compute period attendance for one date across active teachers. Idempotent. |
+| `hikvision:stream {device}` | Long-running worker for the live alertStream. Backfills first, then connects. |
+| `hikvision:backfill {device}` | Replay historical AcsEvent records to fill gaps left by downtime. |
+| `hikvision:dump {device}` | Reconnaissance: dump raw device events to confirm field names. |
+| `teachers:import {file}` | Bulk create/update teachers from CSV. |
+| `timetables:import {file}` | Bulk create/replace timetable versions from CSV. |
+| `demo:seed` | Seed a realistic demo dataset with no device present. |
+
+Both importers validate the **whole file** before writing anything: one bad row
+means nothing is saved, and you get a line-by-line list of what to fix.
+
+## Documentation
+
+- **[docs/setup.md](docs/setup.md)** — the runbook for the school server and the
+  fingerprint terminal. Read the power-model section first; it explains the boot
+  order that makes every outage self-healing.
+- **[docs/onboarding.md](docs/onboarding.md)** — what each role (Admin, Officer,
+  Principal, HR) actually does day to day.
+- **[CLAUDE.md](CLAUDE.md)** — conventions and invariants for anyone, human or
+  agent, changing this codebase.
+
+## Stack
+
+Laravel 13 · Filament 5 · MySQL 8 · Spatie Permission · dompdf · Pest

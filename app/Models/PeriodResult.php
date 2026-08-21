@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Casts\DateOnly;
 use App\Enums\PeriodSource;
 use App\Enums\PeriodStatus;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
@@ -22,7 +23,7 @@ class PeriodResult extends Model
     protected function casts(): array
     {
         return [
-            'date' => 'date',
+            'date' => DateOnly::class,
             'status' => PeriodStatus::class,
             'source' => PeriodSource::class,
             'computed_at' => 'datetime',

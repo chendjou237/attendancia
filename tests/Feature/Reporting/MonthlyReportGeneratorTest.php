@@ -129,3 +129,63 @@ it('refuses to regenerate a report that has already been principal-approved', fu
     expect($result->id)->toBe($report->id);
     expect($result->snapshot_json['totals']['present'])->toBe(999);
 });
+
+// totals() reproduces snapshot()['totals'] as a single grouped query so
+// the dashboard widget doesn't have to hydrate the month. Two
+// implementations of one piece of arithmetic can drift apart silently,
+// and the thing that would drift is the number payroll is read from —
+// so pin them together over a dataset exercising every branch that
+// differs between them: each status, both employment types, an override
+// that changes the effective status, a pending status, a teacher with
+// no results, and a mid-month hours_per_period change.
+it('computes the same totals as a full snapshot, across every status and both employment types', function () {
+    $month = now()->startOfMonth();
+
+    $septemberRule = RuleVersion::factory()->create(['valid_from' => $month->copy()->toDateString(), 'hours_per_period' => 1.00]);
+    $midMonthRule = RuleVersion::factory()->create(['valid_from' => $month->copy()->addDays(15)->toDateString(), 'hours_per_period' => 1.75]);
+
+    $hourly = Teacher::factory()->create(['employment_type' => EmploymentType::Hourly]);
+    $salaried = Teacher::factory()->create(['employment_type' => EmploymentType::Salaried]);
+    Teacher::factory()->create(['employment_type' => EmploymentType::Hourly]);
+
+    $make = function (Teacher $teacher, RuleVersion $rule, PeriodStatus $status, int $day, array $extra = []) use ($month) {
+        return PeriodResult::factory()->create(array_merge([
+            'teacher_id' => $teacher->id,
+            'rule_version_id' => $rule->id,
+            'status' => $status,
+            'date' => $month->copy()->addDays($day),
+        ], $extra));
+    };
+
+    foreach ([PeriodStatus::Present, PeriodStatus::PresentAdmin, PeriodStatus::Absent, PeriodStatus::AbsentJustified, PeriodStatus::Unpaired, PeriodStatus::LocationMismatch] as $i => $status) {
+        $make($hourly, $septemberRule, $status, $i + 1);
+        $make($salaried, $midMonthRule, $status, $i + 16);
+    }
+
+    // An override that flips a pending status into a taught one, and one
+    // that flips a computed Present into an Absent.
+    $make($hourly, $midMonthRule, PeriodStatus::Unpaired, 17, ['override_status' => PeriodStatus::Present]);
+    $make($salaried, $septemberRule, PeriodStatus::Present, 4, ['override_status' => PeriodStatus::Absent]);
+
+    // Superseded rows must be ignored by both paths.
+    $make($hourly, $septemberRule, PeriodStatus::Present, 5, ['is_current' => false]);
+
+    // Outside the month entirely.
+    $make($hourly, $septemberRule, PeriodStatus::Present, -3);
+
+    $totals = generator()->totals($month);
+
+    // Guard against the comparison below passing vacuously on two empty
+    // result sets — every bucket must actually have been exercised.
+    expect($totals)->toBe([
+        'present' => 3,
+        'present_admin' => 2,
+        'absent' => 3,
+        'absent_justified' => 2,
+        'pending' => 4,
+        'payable_hours' => 3.75,
+        'oversight_hours' => 3.5,
+    ]);
+
+    expect($totals)->toBe(generator()->snapshot($month)['totals']);
+});

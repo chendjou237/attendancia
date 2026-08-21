@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Casts\DateOnly;
 use App\Enums\TimetableState;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -17,8 +18,8 @@ class TimetableVersion extends Model
     protected function casts(): array
     {
         return [
-            'valid_from' => 'date',
-            'valid_to' => 'date',
+            'valid_from' => DateOnly::class,
+            'valid_to' => DateOnly::class,
             'state' => TimetableState::class,
             'approved_at' => 'datetime',
         ];

@@ -174,14 +174,12 @@ class SessionBuilder
     public function persist(Teacher $teacher, CarbonInterface $date, Collection $groupings): Collection
     {
         return $groupings->map(function (SessionGrouping $grouping) use ($teacher, $date) {
-            // Not firstOrNew(['date' => ...]): the `date` cast serialises
-            // to "Y-m-d H:i:s" on save, so a raw "Y-m-d" lookup value
-            // never matches an already-saved row on a database that
-            // stores dates as plain text (SQLite) rather than a real
-            // DATE column that discards the time part on compare (MySQL).
+            // The upsert key spelled out explicitly rather than via
+            // firstOrNew(), so the natural key this method promises is
+            // visible at the call site.
             $session = AttendanceSession::query()
                 ->where('teacher_id', $teacher->id)
-                ->whereDate('date', $date->toDateString())
+                ->where('date', $date->toDateString())
                 ->where('first_slot_id', $grouping->firstSlot->id)
                 ->first() ?? new AttendanceSession([
                     'teacher_id' => $teacher->id,

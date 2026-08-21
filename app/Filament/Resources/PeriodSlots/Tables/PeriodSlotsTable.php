@@ -52,14 +52,15 @@ class PeriodSlotsTable
                 // Same versioning as TimetableVersion / RuleVersion: several
                 // valid_from generations of the same (day, seq) can coexist,
                 // so the list defaults to today's active grid rather than
-                // every historical row at once. whereDate(), not a plain
-                // <=/>= comparison — see PeriodSlot::forDate() for why a row
-                // whose valid_from is today would otherwise be excluded.
+                // every historical row at once. now()->toDateString(), not
+                // a bare now(): the columns hold "Y-m-d" (App\Casts\DateOnly),
+                // and comparing one against a full "Y-m-d H:i:s" would drop a
+                // schedule on its own final day.
                 Filter::make('current_only')
                     ->label(__('panel.resources.period_slots.current_only'))
                     ->query(fn (Builder $query): Builder => $query
-                        ->whereDate('valid_from', '<=', now())
-                        ->where(fn (Builder $q) => $q->whereNull('valid_to')->orWhereDate('valid_to', '>=', now())))
+                        ->where('valid_from', '<=', now()->toDateString())
+                        ->where(fn (Builder $q) => $q->whereNull('valid_to')->orWhere('valid_to', '>=', now()->toDateString())))
                     ->default(),
             ])
             ->recordActions([

@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Casts\DateOnly;
 use App\Enums\SessionState;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -28,7 +29,7 @@ class AttendanceSession extends Model
     protected function casts(): array
     {
         return [
-            'date' => 'date',
+            'date' => DateOnly::class,
             'state' => SessionState::class,
         ];
     }
