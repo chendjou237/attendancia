@@ -21,7 +21,8 @@ namespace App\Services\Console;
  *              the Supervisor path, not a degraded fallback. Note the
  *              handler is invoked on a *separate thread*, so it must do
  *              nothing but flip a flag — which is all $onStop does.
- *  - NONE    — neither available. The caller is expected to say so out
+ *  - NONE    — neither available (or the Windows handler refused to
+ *              install). The caller is expected to say so out
  *              loud and carry on: the worker still ingests correctly,
  *              it just gets killed mid-read instead of exiting cleanly.
  *              That is survivable here because raw_events is deduped by
@@ -53,9 +54,12 @@ class GracefulShutdown
             return self::PCNTL;
         }
 
-        if ($this->supportsWindowsCtrlHandler()) {
-            $this->registerWindowsCtrlHandler($onStop);
-
+        // Unlike pcntl, this one can be present and still refuse to
+        // install: the handler needs a console, and a service wrapper
+        // configured not to allocate one leaves PHP with nowhere to
+        // deliver Ctrl+C. Treat that as "no mechanism" so the caller says
+        // so, rather than reporting a shutdown path that will never fire.
+        if ($this->supportsWindowsCtrlHandler() && $this->registerWindowsCtrlHandler($onStop)) {
             return self::WINDOWS;
         }
 
@@ -95,10 +99,12 @@ class GracefulShutdown
      * a handler is set, PHP stops terminating the process itself on
      * Ctrl+C, which is exactly what lets the read loop notice the flag
      * and unwind through the command's own clean-exit path.
+     *
+     * @return bool whether the handler was actually installed
      */
-    protected function registerWindowsCtrlHandler(callable $onStop): void
+    protected function registerWindowsCtrlHandler(callable $onStop): bool
     {
-        sapi_windows_set_ctrl_handler(static function (int $event) use ($onStop): void {
+        return sapi_windows_set_ctrl_handler(static function (int $event) use ($onStop): void {
             $onStop();
         });
     }

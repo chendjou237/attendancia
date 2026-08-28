@@ -73,8 +73,8 @@ New-Item -ItemType Directory -Force -Path $LogDir | Out-Null
 function Remove-ServiceIfPresent($name) {
     if (Get-Service -Name $name -ErrorAction SilentlyContinue) {
         Write-Host "Removing the existing $name service..."
-        & $Nssm stop   $name confirm | Out-Null
-        & $Nssm remove $name confirm | Out-Null
+        & $Nssm stop   $name          | Out-Null
+        & $Nssm remove $name confirm  | Out-Null
         Start-Sleep -Seconds 2
     }
 }

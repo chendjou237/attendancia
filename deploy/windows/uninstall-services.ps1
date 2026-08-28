@@ -32,8 +32,8 @@ foreach ($name in $Services) {
 
     # Give the stream worker its full stop window: it should exit cleanly on
     # the Ctrl+C rather than being killed mid-read.
-    & $Nssm stop   $name confirm | Out-Null
-    & $Nssm remove $name confirm | Out-Null
+    & $Nssm stop   $name          | Out-Null
+    & $Nssm remove $name confirm  | Out-Null
 }
 
 Write-Host "`nDone."
