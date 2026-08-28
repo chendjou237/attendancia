@@ -31,6 +31,30 @@ it('gives up after the timeout rather than blocking forever', function () {
         ->assertFailed();
 });
 
+// The regression that shipping this without a real server nearly hid: the
+// first failed poll used to disconnect() the connection, which nulls the PDO
+// but leaves the Connection cached — so the *second* poll got that null back
+// with no exception and reported a dead server as ready. Any test that polls
+// only once, or that fakes canConnect(), passes right through it.
+it('keeps reporting a configured but unreachable server as not ready, poll after poll', function () {
+    config(['database.connections.unreachable' => [
+        'driver' => 'mysql',
+        'host' => '127.0.0.1',
+        'port' => 1,
+        'database' => 'nothing',
+        'username' => 'nobody',
+        'password' => '',
+    ]]);
+
+    $readiness = new DatabaseReadiness;
+
+    expect($readiness->canConnect('unreachable'))->toBeFalse();
+    expect($readiness->canConnect('unreachable'))->toBeFalse();
+    expect($readiness->canConnect('unreachable'))->toBeFalse();
+
+    expect($readiness->waitUntilReady(timeoutSeconds: 6, connection: 'unreachable'))->toBeFalse();
+});
+
 it('emits a heartbeat while it waits so a stalled boot is visible in the log', function () {
     $this->artisan('db:wait', ['--connection' => 'nope', '--timeout' => 40])
         ->expectsOutputToContain('Still waiting for the database... 16s elapsed')

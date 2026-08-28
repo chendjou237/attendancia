@@ -1,5 +1,10 @@
 <?php
 
+use App\Models\Corridor;
+use App\Models\Device;
+use App\Services\Console\GracefulShutdown;
+use Illuminate\Support\Facades\Log;
+
 it('fails fast when no device with that serial exists', function () {
     $this->artisan('hikvision:stream', ['device' => 'NOPE'])
         ->expectsOutputToContain('No device with serial')
@@ -8,7 +13,7 @@ it('fails fast when no device with that serial exists', function () {
 
 it('fails fast when no credentials are configured', function () {
     config(['attendance.default_user' => null, 'attendance.default_pass' => null]);
-    $device = \App\Models\Device::factory()->for(\App\Models\Corridor::factory())->create(['serial' => 'DEV0001234']);
+    $device = Device::factory()->for(Corridor::factory())->create(['serial' => 'DEV0001234']);
 
     $this->artisan('hikvision:stream', ['device' => $device->serial])
         ->expectsOutputToContain('No ISAPI credentials configured')
@@ -19,7 +24,7 @@ it('fails fast when no credentials are configured', function () {
 // having no signal mechanism at all. Before GracefulShutdown, the
 // unguarded pcntl_async_signals() call fataled here on startup.
 it('starts without signal handling instead of fataling on a build with neither mechanism', function () {
-    $this->app->instance(\App\Services\Console\GracefulShutdown::class, new class extends \App\Services\Console\GracefulShutdown
+    $this->app->instance(GracefulShutdown::class, new class extends GracefulShutdown
     {
         protected function supportsPcntl(): bool
         {
@@ -33,7 +38,7 @@ it('starts without signal handling instead of fataling on a build with neither m
     });
 
     $spy = Mockery::spy();
-    \Illuminate\Support\Facades\Log::shouldReceive('channel')->with('attendance')->andReturn($spy);
+    Log::shouldReceive('channel')->with('attendance')->andReturn($spy);
 
     // Reaching the device lookup at all is the assertion: the command got
     // past signal registration rather than dying inside it.

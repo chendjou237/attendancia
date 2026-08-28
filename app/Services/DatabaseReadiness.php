@@ -7,8 +7,8 @@ use Illuminate\Support\Sleep;
 use Throwable;
 
 /**
- * Polls the app's own database connection until it accepts a connection,
- * or a bounded timeout elapses.
+ * Polls the app's own database connection until it actually serves a
+ * query, or a bounded timeout elapses.
  *
  * Why this exists: docs/setup.md §1 requires "MySQL up -> backfill runs ->
  * live stream starts" on every boot, but the database server and whatever
@@ -75,6 +75,13 @@ class DatabaseReadiness
     }
 
     /**
+     * A real round trip, not just getPdo(): the case this whole class
+     * exists for is a server that is accepting TCP connections while
+     * InnoDB is still replaying its redo log, where connecting can
+     * succeed and querying still fails. `select 1` is the portable way to
+     * ask "are you actually serving?" and is what makes the answer mean
+     * something.
+     *
      * Throwable, not PDOException: a misconfigured driver, a missing
      * extension or a bad DSN all surface differently, and none of them
      * should crash a readiness probe — they should read as "not ready yet"
@@ -83,16 +90,20 @@ class DatabaseReadiness
     public function canConnect(?string $connection = null): bool
     {
         try {
-            DB::connection($connection)->getPdo();
+            DB::connection($connection)->select('select 1');
 
             return true;
         } catch (Throwable) {
-            // Drop the failed handle so the next attempt genuinely
-            // reconnects rather than being handed the same dead one.
+            // purge(), not disconnect(). disconnect() nulls the PDO but
+            // leaves the Connection cached, and getPdo() then hands back
+            // that null without reconnecting — so the *next* poll sees no
+            // exception and reports a dead server as ready. purge() drops
+            // the Connection entirely, so the next attempt builds a fresh
+            // one and genuinely retries.
             try {
-                DB::connection($connection)->disconnect();
+                DB::purge($connection);
             } catch (Throwable) {
-                // Nothing to disconnect; the connection never opened.
+                // No such connection to purge — it was never configured.
             }
 
             return false;
