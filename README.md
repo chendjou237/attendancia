@@ -17,7 +17,7 @@ is a payroll input, so an ambiguous case is escalated, never quietly decided.
 
 ```
 Hikvision terminal
-  │  live alertStream (hikvision:stream, kept up by Supervisor)
+  │  live alertStream (hikvision:stream, kept up by a service supervisor)
   │  AcsEvent replay  (hikvision:backfill, on worker boot + nightly)
   ▼
 raw_events ──────────── append-only; no updates, no deletes, ever

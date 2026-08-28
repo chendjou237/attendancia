@@ -30,13 +30,13 @@ MySQL up  →  backfill runs  →  live stream starts
 
 `hikvision:stream` already does this itself (it runs a backfill before it
 opens the live connection, unless you pass `--skip-backfill`), so as long as
-Supervisor is configured to start it on boot (§12 below), the ordering is
-correct without anything extra. The one part that used to require getting
-something right by hand — MySQL actually being up and accepting connections
-before Supervisor starts the stream worker — is now automatic:
-`deploy/scripts/wait-for-mysql.sh` polls the database before the worker
-starts (see §12), so there's nothing left to configure for this beyond
-following §7 and §12 as written.
+the service supervisor is configured to start it on boot (§12 below), the
+ordering is correct without anything extra. The one part that used to require
+getting something right by hand — MySQL actually being up and accepting
+connections before the stream worker starts — is now automatic: the
+`--wait-for-db` flag makes the worker poll the database itself before doing
+anything else, so there's nothing left to configure for this beyond following
+§7 and §12 as written.
 
 Because there's no UPS, a power cut can kill the server mid-write. MySQL's
 InnoDB storage engine is crash-safe, so the database itself won't corrupt; at
@@ -54,17 +54,27 @@ this guide — is the real constraint.
 
 ## 2. What you're installing
 
-| Component | Role |
-|---|---|
-| PHP 8.3+ with the usual Laravel extensions, plus `pcntl` | Runs the app and the stream worker |
-| MySQL 8 (or MariaDB 10.6+) | The database |
-| Nginx + PHP-FPM (or Caddy) | Serves the admin panel over HTTP on the school LAN |
-| Supervisor | Keeps `hikvision:stream` running and restarts it if it dies |
-| cron | Fires Laravel's scheduler once a minute, which runs the nightly backfill |
+The same five components either way; only the packaging differs.
+
+| Component | Role | On Linux | On Windows Server |
+|---|---|---|---|
+| PHP 8.3+ | Runs the app and the stream worker | distro package | the **Non-Thread-Safe** x64 build from windows.php.net |
+| MySQL 8 (or MariaDB 10.6+) | The database | distro package | MySQL Installer for Windows |
+| A web server | Serves the admin panel over HTTP on the school LAN | Nginx + PHP-FPM (or Caddy) | IIS + FastCGI (or Apache) |
+| A process supervisor | Keeps `hikvision:stream` running and restarts it if it dies | Supervisor | NSSM |
+| A scheduler | Fires Laravel's scheduler, which runs the nightly backfill | cron, once a minute | a second NSSM service running `schedule:work` |
 
 There is **no Redis and no queue worker to run** — sessions, cache, and queue
 all use plain database drivers (see `.env.example`), which is one less service
 to keep alive on a machine with no UPS.
+
+**On `pcntl`**: on Linux the stream worker uses it to catch `SIGTERM` and shut
+down cleanly. It does not exist on Windows — not "usually missing", it cannot
+be built there — so on Windows the worker uses
+`sapi_windows_set_ctrl_handler()` instead, which is what NSSM's Ctrl+C stop
+delivers. Both paths are in `App\Services\Console\GracefulShutdown`, chosen at
+runtime. You do not need to install or configure anything for this; it is
+called out only because older notes listed `pcntl` as a hard requirement.
 
 ---
 
@@ -72,29 +82,82 @@ to keep alive on a machine with no UPS.
 
 - A PC that stays on and network-reachable during school hours (ideally
   always-on), with the Hikvision terminal(s) on the same LAN.
-- OS: any Linux with PHP 8.3+ available is easiest to keep patched. If the
-  school's existing machine is Windows, this guide's package-manager commands
-  won't apply directly — the same components (PHP 8.3+, MySQL, a web server,
-  a process supervisor, a scheduled task) are still needed, just via
-  Windows-native tooling.
-- Root/sudo access to install packages and configure services.
+- Administrator / root access to install packages and configure services.
 
-Verify PHP and its extensions before doing anything else — `pcntl` in
-particular is easy to miss and the stream worker will not run without it:
+Whichever OS, verify PHP **before doing anything else**. If `php -v` reports
+anything under 8.3, find or install a PHP 8.3+ binary and use its full path
+for every command below and in the service configuration — a wrong `php` on
+PATH is the single most common way this install goes sideways.
+
+### Linux
 
 ```bash
 php -v
-php -m | grep -E "pcntl|pdo_mysql|mbstring|bcmath|intl"
+php -m | grep -E "pcntl|pdo_mysql|mbstring|bcmath|intl|curl"
 ```
 
-If `php -v` reports anything under 8.3 (common — many distros' default `php`
-is older), find or install a PHP 8.3+ binary and use its full path for every
-command below and in the Supervisor/cron config, exactly as noted inline in
+Many distros' default `php` is older than 8.3; install a 8.3+ package and use
+its full path, exactly as noted inline in
 `deploy/supervisor/hikvision-stream.conf`.
+
+### Windows Server
+
+1. Download the **Non-Thread-Safe (NTS) x64** build of PHP 8.3+ from
+   [windows.php.net](https://windows.php.net/download/) and unzip it to
+   e.g. `C:\php`. NTS is the build IIS FastCGI and the CLI both want; the
+   Thread-Safe build is only for the long-obsolete ISAPI module.
+2. Install the **Visual C++ Redistributable** the download page names for
+   that build (VS16 or VS17 x64). PHP will not start without it, and the
+   error it gives is unhelpfully generic.
+3. Copy `php.ini-production` to `php.ini` and enable these extensions by
+   removing the leading `;`:
+
+   ```ini
+   extension_dir = "ext"
+
+   extension=bcmath
+   extension=curl
+   extension=fileinfo
+   extension=gd
+   extension=intl
+   extension=mbstring
+   extension=openssl
+   extension=pdo_mysql
+   extension=sodium
+   extension=zip
+   ```
+
+   `curl` and `openssl` are not optional here — the ISAPI client talks to the
+   device with digest auth over Guzzle's curl handler.
+4. Raise the memory limit. The default 128M is not enough for the monthly
+   report PDFs (dompdf):
+
+   ```ini
+   memory_limit = 512M
+   ```
+5. Add `C:\php` to the system PATH, then confirm from a **new** shell:
+
+   ```powershell
+   php -v
+   php -m
+   ```
+
+   `pcntl` will not be listed. That is expected and fine — see §2.
+6. **Exclude the application directory and `C:\php` from Windows Defender
+   real-time scanning.** PHP opens thousands of small files per request and
+   Defender inspects every one; this single setting is the difference between
+   a panel that feels instant and one that takes seconds per page. It is
+   invisible if you don't know to look for it.
+
+   ```powershell
+   Add-MpPreference -ExclusionPath 'C:\inetpub\attendancia', 'C:\php'
+   ```
 
 ---
 
 ## 4. Get the code onto the server
+
+### Linux
 
 ```bash
 git clone <your repository URL> /var/www/attendancia
@@ -103,6 +166,25 @@ composer install --no-dev --optimize-autoloader
 cp .env.example .env
 php artisan key:generate
 ```
+
+### Windows Server
+
+```powershell
+git clone <your repository URL> C:\inetpub\attendancia
+cd C:\inetpub\attendancia
+composer install --no-dev --optimize-autoloader
+copy .env.example .env
+php artisan key:generate
+```
+
+Every path in the rest of this guide assumes `C:\inetpub\attendancia`;
+substitute your own throughout, including in `deploy/windows/*.ps1`.
+
+**Node is not needed on the server.** The `/admin` panel runs entirely on
+Filament's own published assets (`public/css/filament`, `public/js/filament`),
+which `composer install` puts in place. `npm run build` is only needed for the
+Laravel welcome page at `/`, which nothing in this deployment uses — if you
+skip it, `/` errors and `/admin` is fine.
 
 ---
 
@@ -205,38 +287,59 @@ names don't match, stop and fix the normalizer rather than guessing.
 
 ## 7. MySQL and migrations
 
-```bash
-sudo mysql -e "CREATE DATABASE attendancia CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;"
-sudo mysql -e "CREATE USER 'attendancia'@'localhost' IDENTIFIED BY '<the password from your .env>';"
-sudo mysql -e "GRANT ALL PRIVILEGES ON attendancia.* TO 'attendancia'@'localhost';"
+Create the database and its user:
 
-cd /var/www/attendancia
+```sql
+CREATE DATABASE attendancia CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+CREATE USER 'attendancia'@'localhost' IDENTIFIED BY '<the password from your .env>';
+GRANT ALL PRIVILEGES ON attendancia.* TO 'attendancia'@'localhost';
+```
+
+On Linux run those with `sudo mysql -e "..."`; on Windows paste them into MySQL
+Workbench or `mysql -u root -p`.
+
+Then, from the application directory on either platform:
+
+```
 php artisan migrate --force
 php artisan db:seed --class=RoleSeeder
 ```
 
-Install the durability config that pins MySQL's crash-safety settings
-explicitly rather than relying on them silently being the defaults (see
-`deploy/mysql/attendancia.cnf` for why — the short version: no UPS means a
-committed write must survive a power cut, and a generic "performance
-tuning" guide run against this server later would otherwise be the most
-likely thing to break that):
+### Pin the durability settings
+
+These pin MySQL's crash-safety settings explicitly rather than relying on them
+silently being the defaults (see `deploy/mysql/attendancia.cnf` for why — the
+short version: no UPS means a committed write must survive a power cut, and a
+generic "performance tuning" guide run against this server later would
+otherwise be the most likely thing to break that).
+
+**Linux:**
 
 ```bash
 sudo cp deploy/mysql/attendancia.cnf /etc/mysql/mysql.conf.d/attendancia.cnf
 sudo systemctl restart mysql
-mysql -u attendancia -p -e "SHOW VARIABLES LIKE 'innodb_flush_log_at_trx_commit';"
-# expect the value column to read 1
+sudo systemctl enable mysql
 ```
 
 (If your distro's MySQL/MariaDB package uses a different drop-in directory
 than `/etc/mysql/mysql.conf.d/`, put it wherever that install's own `my.cnf`
 `!includedir` line points instead.)
 
-Configure MySQL to start on boot:
+**Windows:** there is no drop-in directory. Paste the contents of
+`deploy/windows/my.ini.snippet` into the `[mysqld]` section of MySQL's
+`my.ini` — usually `C:\ProgramData\MySQL\MySQL Server 8.0\my.ini`, a
+hidden directory — then restart the service:
 
-```bash
-sudo systemctl enable mysql
+```powershell
+Restart-Service MySQL80
+Set-Service MySQL80 -StartupType Automatic
+```
+
+Verify on either platform that it took:
+
+```
+mysql -u attendancia -p -e "SHOW VARIABLES LIKE 'innodb_flush_log_at_trx_commit';"
+# expect the value column to read 1
 ```
 
 ---
@@ -316,8 +419,11 @@ is actually responsible for.
 
 ## 10. Web server
 
-Point Nginx (or your web server of choice) at `public/index.php` the standard
-Laravel way, then enable it to start on boot:
+Point the web server at the **`public/` directory**, never at the application
+root — `.env` lives one level up and is served as plain text by any server
+rooted a directory too high.
+
+### Linux — Nginx + PHP-FPM
 
 ```nginx
 server {
@@ -355,6 +461,58 @@ user:
 ```bash
 sudo chown -R www-data:www-data storage bootstrap/cache
 ```
+
+### Windows Server — IIS + FastCGI
+
+1. Install the IIS role, then two things IIS does not ship with:
+   - **CGI** (Server Manager → Add Roles → Web Server → Application
+     Development → CGI), which is what lets IIS run PHP at all.
+   - The **URL Rewrite** module, from iis.net. Without it IIS ignores
+     `public/web.config`'s rewrite rules and every URL except `/` is a 404 —
+     which looks exactly like a broken app rather than a missing module.
+2. Add a FastCGI application pointing at `C:\php\php-cgi.exe`
+   (IIS Manager → server node → FastCGI Settings → Add). Set:
+   - `InstanceMaxRequests` = 10000
+   - `PHP_FCGI_MAX_REQUESTS` = 10000 under Environment Variables
+   - **Activity Timeout** = 300. The Calendar screens run
+     `attendance:compute` synchronously on save, so a term's worth of
+     calendar entries can legitimately hold a request open past the 30s
+     default.
+3. Create the site with its physical path set to
+   `C:\inetpub\attendancia\public`, and add a handler mapping for `*.php`
+   to that FastCGI module.
+4. `public/web.config` is already in the repo — it is the IIS translation of
+   `public/.htaccess` (front-controller rewrite, trailing-slash redirect,
+   `Authorization` header pass-through, directory browsing off). Nothing to
+   write by hand.
+5. Grant write access where Laravel needs it. This is the `chown` step's
+   equivalent, and it needs doing for **two** identities: the IIS
+   application pool, and whatever account the NSSM services run as
+   (`LocalSystem` by default):
+
+   ```powershell
+   $app = 'C:\inetpub\attendancia'
+   foreach ($dir in @("$app\storage", "$app\bootstrap\cache")) {
+       icacls $dir /grant "IIS AppPool\Attendancia:(OI)(CI)M" /T
+       icacls $dir /grant "SYSTEM:(OI)(CI)M" /T
+   }
+   ```
+6. Open the LAN port. Windows Firewall blocks inbound 80 by default, so the
+   panel is reachable from the server itself and nowhere else until this is
+   done:
+
+   ```powershell
+   New-NetFirewallRule -DisplayName 'Attendancia HTTP' -Direction Inbound `
+       -Protocol TCP -LocalPort 80 -Action Allow -Profile Domain,Private
+   ```
+
+**Apache instead?** If whoever maintains the machine already knows Apache,
+that works too and needs no extra file: `public/.htaccess` is used as-is.
+Install Apache as a Windows service with `mod_rewrite` and `mod_fcgid`
+enabled, set `DocumentRoot` to `...\attendancia\public`, and add
+`AllowOverride All` for that directory — without it `.htaccess` is silently
+ignored and you get the same "everything 404s" symptom as a missing URL
+Rewrite module.
 
 ---
 
@@ -394,54 +552,81 @@ by `staff_no` and will reject rows for anyone not yet in the system.
 
 ---
 
-## 12. Supervisor — keep the live stream running
+## 12. Keep the live stream running
 
-First, make sure the `deploy/scripts/wait-for-mysql.sh` guard is executable
-— the Supervisor command below runs it before starting the stream worker:
+`hikvision:stream` is a long-running worker that must come back automatically
+after a crash, a device outage, or a power cut. On Linux that is Supervisor;
+on Windows it is NSSM. The behaviour both are configured for is the same, and
+two settings in it are load-bearing:
 
-```bash
-chmod +x deploy/scripts/wait-for-mysql.sh
-```
+- **Retry forever.** An offline device is retried indefinitely rather than
+  given up on — correct for a terminal that might legitimately be powered off
+  or network-isolated for hours.
+- **A start-success window longer than 10 seconds.** The worker's own
+  `connectTimeout` is 10s, so an unreachable device makes it exit *faster*
+  than a default "did it start successfully?" window. Too low a value and the
+  supervisor reads every reconnect attempt as an immediate crash and stops
+  retrying entirely — the opposite of what you want.
 
-Copy the provided config and point it at your actual PHP 8.3+ binary and app
-path:
+The worker also runs `--wait-for-db`, which polls the database before it does
+anything else. That is what makes §1's boot order (MySQL up → backfill → live
+stream) hold automatically, without you having to reason about whether the
+database service and the supervisor happen to race each other on a given boot.
+If MySQL is still doing InnoDB crash recovery from the last power cut, the log
+shows a heartbeat line every ~15s until it's ready, instead of the worker
+crash-looping against a database that isn't accepting connections yet.
+
+### Linux — Supervisor
 
 ```bash
 sudo cp deploy/supervisor/hikvision-stream.conf /etc/supervisor/conf.d/
 sudo $EDITOR /etc/supervisor/conf.d/hikvision-stream.conf
-# update the `command=` line's php path, app path (appears three times:
-# the wait-for-mysql.sh path, the artisan path, and the device serial
-# argument), and the `directory=` line, to match this server
+# update the `command=` line's php path, app path and device serial, and
+# the `directory=` line, to match this server
 sudo systemctl enable supervisor
 sudo supervisorctl reread
 sudo supervisorctl update
 sudo supervisorctl status hikvision-stream
 ```
 
-The config's `command=` line runs `wait-for-mysql.sh` before it execs into
-`hikvision:stream` — this is what makes §1's boot order (MySQL up → backfill
-→ live stream) hold automatically, without you having to reason about
-whether `systemctl enable mysql` and Supervisor's own autostart happen to
-race each other on a given boot. If MySQL is still doing InnoDB crash
-recovery from the last power cut, the worker's log will show a heartbeat
-line every ~15s until it's ready, instead of the stream worker crash-looping
-against a database that isn't accepting connections yet.
+The config already has `startretries=999`, `autorestart=true` and
+`startsecs=10`. Don't lower `startsecs` — see the second bullet above; the
+reasoning is also documented inline in the conf file.
 
-The config already has `startretries=999` and `autorestart=true` — an
-offline device is retried forever rather than giving up, which is the
-correct behaviour for a terminal that might legitimately be powered off or
-network-isolated for hours. `startsecs=10` is deliberate and documented
-inline in the conf file — don't lower it; a too-low value makes Supervisor
-treat every reconnect attempt against an unreachable device as an immediate
-crash and it stops retrying entirely.
+### Windows Server — NSSM
 
-If there's more than one device/corridor eventually, add one
-`[program:hikvision-stream-<corridor>]` block per device, each with its own
-device serial argument and log file.
+1. Download NSSM from [nssm.cc](https://nssm.cc/download), and put
+   `win64\nssm.exe` somewhere on PATH.
+2. Edit the four variables at the top of
+   `deploy\windows\install-services.ps1` — the PHP path, the app root, the
+   device serial from §6, and the log directory.
+3. Run it from an **elevated** PowerShell prompt:
+
+   ```powershell
+   cd C:\inetpub\attendancia\deploy\windows
+   .\install-services.ps1
+   ```
+
+That installs **two** services, both set to start at boot:
+`AttendanciaStream` (this section) and `AttendanciaScheduler` (§13). The
+script is commented with which NSSM setting corresponds to which Supervisor
+one; the ones that matter are `AppExit Default Restart` with
+`AppThrottle 15000` (retry forever, back off on fast failures) and
+`AppStopMethodConsole 15000` (stop by sending Ctrl+C, which the worker catches
+and exits cleanly on — the equivalent of Supervisor's `stopsignal=TERM`).
+
+```powershell
+Get-Service AttendanciaStream, AttendanciaScheduler
+```
+
+**If there's more than one device/corridor eventually**, add one service per
+device, each with its own serial and log file — on Linux, one
+`[program:hikvision-stream-<corridor>]` block per device; on Windows, run the
+install script again with a different `$Serial` and `$StreamSvc`.
 
 ---
 
-## 13. cron — the nightly backfill and recompute
+## 13. The nightly backfill and recompute
 
 At `02:00` local time, `routes/console.php` runs `NightlyRecovery`: a
 backfill for every active device, then `attendance:compute` for today and
@@ -453,8 +638,9 @@ longer outage (more than a day) needs a human to run `attendance:compute
 same way it already needs `hikvision:backfill --hours=N` for a window
 longer than the default 48h.
 
-This is driven by Laravel's own scheduler, which needs exactly one
-crontab entry:
+This is driven by Laravel's own scheduler, which has to be running.
+
+**Linux** — one crontab entry:
 
 ```bash
 sudo crontab -e -u www-data
@@ -466,21 +652,49 @@ sudo crontab -e -u www-data
 
 (Use the same PHP 8.3+ binary path as everywhere else in this guide.)
 
+**Windows** — nothing to do; `install-services.ps1` already installed the
+`AttendanciaScheduler` service, which runs `artisan schedule:work`. That is
+the long-running form of the same thing, and as a service it's both simpler
+and cheaper than a Task Scheduler entry that spawns PHP 1,440 times a day.
+Confirm it's running and that it can see the schedule:
+
+```powershell
+Get-Service AttendanciaScheduler
+php artisan schedule:list
+```
+
 ---
 
 ## 14. Backups
 
 There's no UPS, so treat abrupt shutdowns as routine, not exceptional.
-InnoDB survives them, but that's not a substitute for a real backup — add a
-nightly `mysqldump` to cron, writing to a separate disk or off-machine
-location if at all possible:
+InnoDB survives them, but that's not a substitute for a real backup. Run the
+dump **before** the 02:00 nightly backfill so a restore never needs to re-run
+a backfill that already happened against the dump, and write it to a separate
+disk or off-machine location if at all possible.
+
+**Linux** — a crontab entry:
 
 ```
 30 1 * * * mysqldump -u attendancia -p'<password>' attendancia | gzip > /var/backups/attendancia-$(date +\%F).sql.gz
 ```
 
-Run this **before** the 02:00 nightly backfill so a restore never needs to
-re-run a backfill that already happened against the dump.
+**Windows** — `deploy\windows\backup.bat`, scheduled at 01:30:
+
+```powershell
+schtasks /create /tn "Attendancia backup" /sc daily /st 01:30 /ru SYSTEM `
+         /tr "C:\inetpub\attendancia\deploy\windows\backup.bat"
+```
+
+Edit the paths at the top of the script first. It reads the password from a
+MySQL option file rather than taking it on the command line — put one at the
+path `CREDENTIALS` names, readable only by the backup account:
+
+```ini
+[client]
+user=attendancia
+password=<the password from your .env>
+```
 
 ---
 
@@ -491,8 +705,10 @@ Work through this checklist once setup is complete:
 1. `php artisan migrate:status` — all migrations ran.
 2. Log into the admin panel at `http://<server-address>/admin` with the
    account from §9.
-3. `sudo supervisorctl status hikvision-stream` — `RUNNING`, not
-   `FATAL`/`BACKOFF`.
+3. The stream worker is up:
+   - Linux: `sudo supervisorctl status hikvision-stream` — `RUNNING`, not
+     `FATAL`/`BACKOFF`.
+   - Windows: `Get-Service AttendanciaStream` — `Running`, not `Stopped`.
 4. Walk to the device and do one real scan-in and scan-out for a real,
    entered teacher during one of their scheduled periods.
 5. Check the `devices` row for that device in the admin panel —
@@ -506,8 +722,8 @@ Work through this checklist once setup is complete:
    an intentionally malformed test (e.g. only a scan-in, no scan-out) should
    show up as `Unpaired` and be resolvable there.
 8. Kill power to the server, wait a minute, restore it. Confirm it boots
-   unattended, `hikvision-stream` comes back up on its own
-   (`supervisorctl status`), and re-running `hikvision:dump` or checking
+   unattended, the stream worker comes back up on its own, and re-running
+   `hikvision:dump` or checking
    `raw_events` shows no gap and no duplicated events for the outage window.
    Recovering `raw_events` isn't the whole story, though — a scan for a
    period that's already passed only becomes a `Present`/`Absent` result
@@ -515,12 +731,30 @@ Work through this checklist once setup is complete:
    that automatically for today/yesterday; to confirm the gap is actually
    closed, don't just check `raw_events` — check that a `period_results`
    row exists for the affected teacher and date too.
-   While it's coming back up, check
-   `tail -f /var/log/hikvision-stream.log` — you should see
-   `wait-for-mysql` heartbeat lines (§12) while MySQL is still recovering,
-   then a single "MySQL is up" line, then the worker's own startup output.
-   Repeated crash/restart cycles instead of clean heartbeats means the
-   boot-order fix isn't actually wired up — check §16.
+   While it's coming back up, follow the worker's log — `tail -f
+   /var/log/hikvision-stream.log` on Linux, `Get-Content -Wait
+   storage\logs\hikvision-stream.log` on Windows. You should see
+   "Still waiting for the database..." heartbeat lines (§12) while MySQL is
+   still recovering, then a single "The database is up." line, then the
+   worker's own startup output. Repeated crash/restart cycles instead of
+   clean heartbeats means the boot-order fix isn't actually wired up —
+   check §16.
+
+9. **Windows only** — confirm the stop path is clean, because this is the
+   one behaviour that differs between the two platforms and the one that
+   silently degrades if PHP was installed without a console:
+
+   ```powershell
+   nssm stop AttendanciaStream
+   Get-Content C:\inetpub\attendancia\storage\logs\hikvision-stream.log -Tail 5
+   ```
+
+   The log's last line should be *"Received termination signal, exiting
+   cleanly."* If instead it just stops mid-sentence, the Ctrl+C never
+   reached PHP — check `nssm edit AttendanciaStream` and make sure
+   **Console** is the first shutdown method and "Don't create a console
+   window" is unchecked. Ingestion still works either way (see §16), but
+   you lose the clean shutdown.
 
 If you don't have a device available yet to test any of this against, see
 `docs/onboarding.md`'s note on `demo:seed` — it exercises the full ingestion
@@ -531,10 +765,12 @@ sanity-checking the *app* independently of whether the device is reachable.
 
 ## 16. Troubleshooting
 
-- **`hikvision:stream` exits immediately, Supervisor gives up (`FATAL`)** —
-  check `startsecs` wasn't lowered (§12), and check the device IP/credentials
-  in `.env` are correct. Run `hikvision:dump` manually to see the actual
-  connection error.
+- **`hikvision:stream` exits immediately and the supervisor gives up**
+  (Supervisor `FATAL`, or an NSSM service that keeps landing back in
+  `Stopped`) — check the start-success window wasn't lowered (§12:
+  `startsecs` on Linux, `AppThrottle` on Windows), and check the device
+  IP/credentials in `.env` are correct. Run `hikvision:dump` manually to see
+  the actual connection error.
 - **Digest auth failures** — confirm the ISAPI user created in §6 has the
   right permission level on the device (some firmware requires "Media User"
   or "Operator" rather than "Viewer" for event subscription endpoints).
@@ -551,19 +787,43 @@ sanity-checking the *app* independently of whether the device is reachable.
   re-enrolled on the device needs a new mapping row here (closing out the old
   one), otherwise the old id keeps pointing at them and the new one resolves
   to nobody.
-- **`hikvision-stream.log` shows repeated `wait-for-mysql: still waiting...`
-  heartbeats that never resolve** — don't wait for Supervisor to eventually
-  show `FATAL` as your signal that something's actually wrong; with
-  `startretries=999` and each attempt free to poll for up to
-  `WAIT_FOR_MYSQL_TIMEOUT` (default 300s) before failing, reaching `FATAL`
-  this way could take a very long time if MySQL never comes back. Use the
-  heartbeat count instead: a few minutes of heartbeats right after a boot
-  that followed a long outage is normal (InnoDB crash recovery genuinely
-  takes longer the more was in-flight when power was lost) — but if it's
-  still polling well past that, treat it as a real fault. Check
-  `systemctl status mysql` first (it may have failed to start at all, not
-  just be slow), then confirm `DB_HOST`/`DB_PORT`/`DB_USERNAME`/
-  `DB_PASSWORD` in `.env` are still correct, then once MySQL is confirmed
-  reachable (`mysqladmin ping -h ... -u ... -p...`) run
-  `sudo supervisorctl restart hikvision-stream` to pick it up immediately
-  rather than waiting on Supervisor's own retry timing.
+- **The worker's log shows repeated `Still waiting for the database...`
+  heartbeats that never resolve** — don't wait for the supervisor to give up
+  as your signal that something's actually wrong; it retries forever, and
+  each attempt is free to poll for up to `--db-timeout` (default 300s)
+  before failing, so that could take a very long time if MySQL never comes
+  back. Use the heartbeat count instead: a few minutes of heartbeats right
+  after a boot that followed a long outage is normal (InnoDB crash recovery
+  genuinely takes longer the more was in-flight when power was lost) — but
+  if it's still polling well past that, treat it as a real fault. Check the
+  database service first (`systemctl status mysql` / `Get-Service MySQL80`)
+  — it may have failed to start at all, not just be slow — then confirm
+  `DB_HOST`/`DB_PORT`/`DB_USERNAME`/`DB_PASSWORD` in `.env` are still
+  correct, then check by hand with `php artisan db:wait --timeout=5`. Once
+  MySQL is confirmed reachable, restart the worker
+  (`sudo supervisorctl restart hikvision-stream` /
+  `nssm restart AttendanciaStream`) to pick it up immediately rather than
+  waiting on the supervisor's own retry timing.
+
+- **Windows: every URL except `/` returns 404** — the URL Rewrite module
+  isn't installed, so IIS is ignoring `public/web.config` (§10). On Apache,
+  the same symptom means `AllowOverride All` is missing and `.htaccess` is
+  being ignored.
+
+- **Windows: the log warns "no signal handling available on this PHP build"**
+  — informational, not a fault. Stops become a hard kill instead of a clean
+  exit. Nothing is lost when that happens: `raw_events` is deduped on
+  `UNIQUE(device_serial, device_event_serial)` and the boot-time backfill
+  re-reads the window, so a killed worker's window is recovered on restart.
+  It does mean `sapi_windows_set_ctrl_handler` is unavailable, which usually
+  means PHP is running without a console — see §15.9.
+
+- **Windows: the `attendance.log` daily rotation misbehaves at midnight** —
+  `config/logging.php`'s `attendance` channel is a rotating file written by
+  *both* the stream worker and the web server. Windows keeps a lock on an
+  open file, so the midnight rename can fail while a process still holds the
+  handle, and you may see a stale or missing `attendance-YYYY-MM-DD.log`.
+  This is a logging artefact only — ingestion is unaffected — and the
+  worker's own NSSM stdout log (`storage\logs\hikvision-stream.log`) is the
+  authoritative record for anything the worker did. Don't read a gap here as
+  a gap in `raw_events`; check the table.
