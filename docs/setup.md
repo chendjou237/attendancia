@@ -64,6 +64,8 @@ The same five components either way; only the packaging differs.
 | A process supervisor | Keeps `hikvision:stream` running and restarts it if it dies | Supervisor | NSSM |
 | A scheduler | Fires Laravel's scheduler, which runs the nightly backfill | cron, once a minute | a second NSSM service running `schedule:work` |
 
+Official download links for every one of these are in §3.
+
 There is **no Redis and no queue worker to run** — sessions, cache, and queue
 all use plain database drivers (see `.env.example`), which is one less service
 to keep alive on a machine with no UPS.
@@ -96,19 +98,55 @@ php -v
 php -m | grep -E "pcntl|pdo_mysql|mbstring|bcmath|intl|curl"
 ```
 
-Many distros' default `php` is older than 8.3; install a 8.3+ package and use
-its full path, exactly as noted inline in
-`deploy/supervisor/hikvision-stream.conf`.
+Install everything (PHP, MySQL, Nginx, Supervisor, git, Composer) through the
+distro's own package manager, so it stays patched with the rest of the OS —
+not from a downloaded tarball or a bundle like XAMPP, which makes you
+responsible for tracking every future security fix by hand.
+
+Many distros' default `php` is older than 8.3. On Debian/Ubuntu the standard
+fix is Ondřej Surý's PPA,
+[launchpad.net/~ondrej/+archive/ubuntu/php](https://launchpad.net/~ondrej/+archive/ubuntu/php),
+which extends `apt` with current PHP versions so they still update normally;
+on RHEL-family distros the equivalent is [Remi's repository](https://rpms.remirepo.net/).
+Either way, install a 8.3+ package and use its full path, exactly as noted
+inline in `deploy/supervisor/hikvision-stream.conf`.
 
 ### Windows Server
 
-1. Download the **Non-Thread-Safe (NTS) x64** build of PHP 8.3+ from
-   [windows.php.net](https://windows.php.net/download/) and unzip it to
-   e.g. `C:\php`. NTS is the build IIS FastCGI and the CLI both want; the
-   Thread-Safe build is only for the long-obsolete ISAPI module.
-2. Install the **Visual C++ Redistributable** the download page names for
-   that build (VS16 or VS17 x64). PHP will not start without it, and the
-   error it gives is unhelpfully generic.
+Download everything from the official source below — not from XAMPP, WAMP,
+or a software-bundle site. Those are development conveniences that package
+their own PHP/MySQL/Apache and patch on their own schedule (or not at all),
+which is the wrong trade for a machine that has to run unattended at a
+school for years.
+
+| What | Official download | Notes |
+|---|---|---|
+| PHP 8.3+ | [windows.php.net/download](https://windows.php.net/download/) | Take the **Non-Thread-Safe (NTS) x64** zip |
+| Visual C++ Redistributable | [aka.ms/vc14/vc_redist.x64.exe](https://aka.ms/vc14/vc_redist.x64.exe) | Direct Microsoft permalink, always the latest supported x64 build |
+| Git | [git-scm.com/install/windows](https://git-scm.com/install/windows) | 64-bit **Standalone Installer**; or `winget install --id Git.Git -e` |
+| Composer | [getcomposer.org/Composer-Setup.exe](https://getcomposer.org/Composer-Setup.exe) | The official Windows installer; adds `composer` to PATH for you |
+| MySQL 8 | [dev.mysql.com/downloads/installer](https://dev.mysql.com/downloads/installer/) | MySQL Installer for Windows — pick **Server** + **Workbench** |
+| NSSM | [nssm.cc/download](https://nssm.cc/download) | Runs the stream worker and scheduler as Windows services (§12) |
+| IIS URL Rewrite 2.1 | [iis.net/downloads/microsoft/url-rewrite](https://www.iis.net/downloads/microsoft/url-rewrite) | Required by `public/web.config` (§10) |
+
+IIS itself ships with Windows Server — it's a role you enable, not a
+download (§10). Node.js is **not** needed on the server at all (§4).
+
+**Order matters**: PHP first (steps 1–5 below), then Composer — its
+installer looks for a PHP binary on PATH and stops if it can't find one.
+Git can go in at any point, but all three need to be in before §4, or
+`git clone` and `composer install` there will have nothing to run. MySQL
+(§7), IIS + URL Rewrite (§10), and NSSM (§12) are each installed at the
+section that uses them, so you can leave those until you get there.
+
+Then, to set PHP up:
+
+1. Unzip the PHP NTS x64 build to e.g. `C:\php`. NTS is the build IIS
+   FastCGI and the CLI both want; the Thread-Safe build is only for the
+   long-obsolete ISAPI module.
+2. Install the **Visual C++ Redistributable** from the link above *before*
+   trying to run PHP. PHP will not start without it, and the error it gives
+   is unhelpfully generic.
 3. Copy `php.ini-production` to `php.ini` and enable these extensions by
    removing the leading `;`:
 
@@ -298,6 +336,15 @@ GRANT ALL PRIVILEGES ON attendancia.* TO 'attendancia'@'localhost';
 On Linux run those with `sudo mysql -e "..."`; on Windows paste them into MySQL
 Workbench or `mysql -u root -p`.
 
+On Windows, install MySQL first if you haven't — the
+[MySQL Installer for Windows](https://dev.mysql.com/downloads/installer/)
+(§3), choosing the **Server** and **Workbench** products. During setup pick
+"Standalone MySQL Server", and when it asks about the Windows service, leave
+it set to start automatically at boot: that's the first link in §1's
+boot-order chain. Note Oracle's own notice on that page — 8.0 is the last
+series shipped through MySQL Installer, so a later 8.x is installed from its
+own MSI or zip archive instead.
+
 Then, from the application directory on either platform:
 
 ```
@@ -467,9 +514,11 @@ sudo chown -R www-data:www-data storage bootstrap/cache
 1. Install the IIS role, then two things IIS does not ship with:
    - **CGI** (Server Manager → Add Roles → Web Server → Application
      Development → CGI), which is what lets IIS run PHP at all.
-   - The **URL Rewrite** module, from iis.net. Without it IIS ignores
-     `public/web.config`'s rewrite rules and every URL except `/` is a 404 —
-     which looks exactly like a broken app rather than a missing module.
+   - The **URL Rewrite 2.1** module, from
+     [iis.net/downloads/microsoft/url-rewrite](https://www.iis.net/downloads/microsoft/url-rewrite)
+     (§3). Without it IIS ignores `public/web.config`'s rewrite rules and
+     every URL except `/` is a 404 — which looks exactly like a broken app
+     rather than a missing module.
 2. Add a FastCGI application pointing at `C:\php\php-cgi.exe`
    (IIS Manager → server node → FastCGI Settings → Add). Set:
    - `InstanceMaxRequests` = 10000
