@@ -3,6 +3,8 @@
 namespace App\Console\Commands;
 
 use App\Models\Device;
+use App\Services\Console\GracefulShutdown;
+use App\Services\DatabaseReadiness;
 use App\Services\Hikvision\DeviceClock;
 use App\Services\Hikvision\DeviceCredentials;
 use App\Services\Hikvision\EventNormalizer;
@@ -18,16 +20,24 @@ use Illuminate\Support\Facades\Log;
  * §7.2: the live path. Holds the alertStream connection open for days,
  * parsing JSON objects out of the byte stream as they arrive.
  *
- * Every exit path except a clean SIGTERM/SIGINT is non-zero, including
- * a clean stream end — a finished stream still means punches have
- * stopped being recorded, and Supervisor should restart the worker.
- * The one exception matters for Supervisor's own stopwaitsecs: without
- * a clean 0 on a deliberate stop, Supervisor waits out the full
- * stopwaitsecs timeout and SIGKILLs instead of a fast, clean shutdown.
+ * Every exit path except a deliberate stop is non-zero, including a
+ * clean stream end — a finished stream still means punches have stopped
+ * being recorded, and the supervisor should restart the worker. The one
+ * exception matters for how the supervisor stops it: without a clean 0
+ * on a deliberate stop, Supervisor waits out the full stopwaitsecs and
+ * SIGKILLs (and NSSM waits out AppStopMethodConsole and kills the
+ * process) instead of a fast, clean shutdown.
+ *
+ * "A deliberate stop" is SIGTERM/SIGINT on Linux and Ctrl+C/Ctrl+Break on
+ * Windows; GracefulShutdown picks whichever this PHP build supports.
  */
 class StreamHikvisionEvents extends Command
 {
-    protected $signature = 'hikvision:stream {device : devices.serial} {--skip-backfill : skip the boot-time backfill catch-up}';
+    protected $signature = 'hikvision:stream
+        {device : devices.serial}
+        {--skip-backfill : skip the boot-time backfill catch-up}
+        {--wait-for-db : block until the database accepts connections before starting}
+        {--db-timeout= : seconds to wait for the database, defaults to 300}';
 
     protected $description = 'Long-running worker for the Hikvision alertStream live event feed (§7.2).';
 
@@ -38,7 +48,19 @@ class StreamHikvisionEvents extends Command
         EventNormalizer $normalizer,
         EventProcessor $processor,
         DeviceClock $clock,
+        GracefulShutdown $shutdown,
+        DatabaseReadiness $readiness,
     ): int {
+        // Signals first, before anything that can block: --wait-for-db can
+        // legitimately sit here for minutes on a post-power-cut boot, and a
+        // stop requested during that wait has to be honoured rather than
+        // needing the supervisor's hard kill.
+        $this->registerSignalHandlers($shutdown);
+
+        if ($this->option('wait-for-db') && ! $this->waitForDatabase($readiness)) {
+            return $this->stopping ? self::SUCCESS : self::FAILURE;
+        }
+
         $device = Device::where('serial', $this->argument('device'))->first();
 
         if ($device === null) {
@@ -54,8 +76,6 @@ class StreamHikvisionEvents extends Command
 
             return self::FAILURE;
         }
-
-        $this->registerSignalHandlers();
 
         $clock->poll($device, $user, $pass);
 
@@ -147,19 +167,61 @@ class StreamHikvisionEvents extends Command
     }
 
     /**
-     * pcntl_async_signals(true) must come before pcntl_signal() — without
-     * it, handlers never fire during a blocking stream read, and
-     * Supervisor's TERM does nothing until stopwaitsecs forces a SIGKILL.
+     * Which mechanism is available depends on the platform — see
+     * GracefulShutdown. Neither being available is not fatal: it only
+     * means a stop arrives as a hard kill, which dedup and the boot-time
+     * backfill already absorb. It is still worth a log line, because
+     * "the worker never logs a clean exit" is otherwise indistinguishable
+     * from a crash when you are reading the log after the fact.
      */
-    private function registerSignalHandlers(): void
+    private function registerSignalHandlers(GracefulShutdown $shutdown): void
     {
-        pcntl_async_signals(true);
-
-        $handler = function (): void {
+        $mechanism = $shutdown->register(function (): void {
             $this->stopping = true;
-        };
+        });
 
-        pcntl_signal(SIGTERM, $handler);
-        pcntl_signal(SIGINT, $handler);
+        if ($mechanism === GracefulShutdown::NONE) {
+            Log::channel('attendance')->warning(
+                'hikvision:stream: no signal handling available on this PHP build — '
+                .'stops will be a hard kill, not a clean exit. Ingestion is unaffected '
+                .'(raw_events is deduped and the boot backfill re-reads the window).'
+            );
+        }
+    }
+
+    /**
+     * docs/setup.md §1's boot order (database up -> backfill -> live
+     * stream) folded into the worker itself, so the supervisor can point
+     * straight at the PHP binary instead of wrapping it in a shell that
+     * runs a readiness script first. That wrapper was also what stood
+     * between the supervisor's stop signal and this process.
+     */
+    private function waitForDatabase(DatabaseReadiness $readiness): bool
+    {
+        $timeout = (int) ($this->option('db-timeout') ?: DatabaseReadiness::DEFAULT_TIMEOUT_SECONDS);
+
+        $this->info("Waiting for the database, timeout {$timeout}s...");
+
+        $ready = $readiness->waitUntilReady(
+            timeoutSeconds: $timeout,
+            onHeartbeat: fn (int $elapsed) => $this->line("Still waiting for the database... {$elapsed}s elapsed"),
+            shouldStop: fn () => $this->stopping,
+        );
+
+        if ($ready) {
+            $this->info('The database is up.');
+
+            return true;
+        }
+
+        if ($this->stopping) {
+            $this->info('Received termination signal while waiting for the database, exiting cleanly.');
+
+            return false;
+        }
+
+        $this->error("Gave up after {$timeout}s — the database never became reachable.");
+
+        return false;
     }
 }

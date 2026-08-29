@@ -1,0 +1,24 @@
+; Paste into the [mysqld] section of MySQL's my.ini on Windows — usually
+; C:\ProgramData\MySQL\MySQL Server 8.0\my.ini — then restart the MySQL
+; service. Windows MySQL has no /etc/mysql/mysql.conf.d/ drop-in directory,
+; which is the only reason this is a separate file from
+; deploy/mysql/attendancia.cnf; the settings themselves are identical and
+; mean exactly the same thing on both platforms.
+;
+; No UPS on this server (docs/setup.md §1) — mains can die mid-write at any
+; moment. These are MySQL 8's own defaults; pinned explicitly so a later
+; "performance tuning" pass can't silently trade away crash safety on the
+; one setting this whole deployment design depends on:
+;
+; innodb_flush_log_at_trx_commit=1 flushes and fsyncs the InnoDB redo log
+; on every transaction commit, so a committed write survives a power cut.
+; Common "tuning" advice sets this to 0 or 2 for write throughput — do not
+; do that here; the tradeoff it makes (losing up to ~1s of recent commits
+; on a crash) is exactly the risk this deployment has no UPS to cover.
+;
+; innodb_doublewrite=ON protects against a torn page — a write interrupted
+; mid-flush by exactly the kind of abrupt power loss this server is
+; designed to expect. Off trades this protection for a small write
+; throughput gain; not worth it here either.
+innodb_flush_log_at_trx_commit = 1
+innodb_doublewrite = ON

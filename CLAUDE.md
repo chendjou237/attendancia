@@ -4,12 +4,18 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Commands
 
-**PHP version matters.** `php` on PATH is 8.2, below this project's `^8.3`
-requirement. Use Herd's 8.4 binary for anything that boots the app:
+**PHP version matters.** On the macOS dev machine, `php` on PATH is 8.2, below
+this project's `^8.3` requirement. Use Herd's 8.4 binary for anything that
+boots the app:
 
 ```bash
 "/Users/saint/Library/Application Support/Herd/bin/php84" artisan test
 ```
+
+On the Windows server it's `C:\php\php.exe` (the Non-Thread-Safe build — see
+`docs/setup.md` §3). Wherever you are, check `php -v` before assuming the `php`
+on PATH is the right one; a wrong binary is the most common cause of a confusing
+failure here.
 
 | Task | Command |
 |---|---|
@@ -127,6 +133,27 @@ The panel defaults to **French**. `lang/en` and `lang/fr` must stay at full
 parity — every user-facing string goes through `__('panel....')` or
 `__('attendance....')`. Never hardcode display text in a resource, page, or
 Blade view.
+
+## Platform support
+
+Development is on macOS/Linux; **production is Windows Server**. The
+application code has to run on both, and the ways that breaks are quiet:
+
+- **No unguarded `pcntl_*` or `posix_*`.** Neither extension exists on
+  Windows, so an unguarded call is a fatal error, not a degraded feature.
+  Graceful shutdown goes through `App\Services\Console\GracefulShutdown`,
+  which picks `pcntl` or `sapi_windows_set_ctrl_handler()` at runtime; add
+  new long-running commands through it rather than calling either directly.
+- **No shell-outs.** No `exec`, `shell_exec`, `proc_open`, or backticks, and
+  no assuming a Unix binary is on PATH. The readiness check that used to be
+  `wait-for-mysql.sh` is `App\Services\DatabaseReadiness` for exactly this
+  reason.
+- **Build paths with `storage_path()`/`base_path()`**, never by concatenating
+  a leading `/`. Forward slashes inside a path are fine on Windows; a `:` in
+  a filename is not (see `DumpHikvisionEvents`' `His` timestamp format).
+- **Deploy configs come in pairs.** `deploy/supervisor/` + `deploy/windows/`,
+  `public/.htaccess` + `public/web.config`. Changing one means changing the
+  other, and `docs/setup.md` documents both.
 
 ## Known unfixed issues
 
