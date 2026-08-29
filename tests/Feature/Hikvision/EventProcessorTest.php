@@ -8,6 +8,7 @@ use App\Models\TeacherBiometricId;
 use App\Services\Hikvision\EventNormalizer;
 use App\Services\Hikvision\EventProcessor;
 use Carbon\Carbon;
+use Illuminate\Support\Facades\Log;
 
 function device(): Device
 {
@@ -143,4 +144,39 @@ it('does not store anything for a majorEventType 5 event with no serialNo', func
     (new EventProcessor)->handle($event, $d, 'stream');
 
     expect(RawEvent::count())->toBe(0);
+});
+
+// The DS-K1T8005EFX adds a 125kHz EM proximity card reader. Card
+// verification passes as majorEventType 5 / subEventType 1 — a
+// recognised code that attendance deliberately refuses, because a card
+// can be lent or cloned and these records become payable hours. See
+// tests/Feature/Attendance/CardVerificationTest.php for the end-to-end
+// guarantee that one never becomes a Present.
+it('stores a card scan (subEventType 1) without attempting teacher resolution', function () {
+    $d = device();
+    $teacher = Teacher::factory()->create();
+    TeacherBiometricId::factory()->for($teacher)->create(['biometric_id' => '7', 'valid_from' => '2020-01-01', 'valid_to' => null]);
+
+    $event = (new EventNormalizer)->fromStreamPayload(streamPayload(['subEventType' => 1]));
+    (new EventProcessor)->handle($event, $d, 'stream');
+
+    $raw = RawEvent::first();
+    expect($raw)->not->toBeNull()
+        ->and($raw->sub_event_type)->toBe(1)
+        // Resolvable — the mapping exists and matches — and deliberately
+        // left unresolved anyway.
+        ->and($raw->teacher_id)->toBeNull();
+});
+
+it('logs a card scan as an ignored card, not as an unrecognised sub-type', function () {
+    $spy = Mockery::spy();
+    Log::shouldReceive('channel')->with('attendance')->andReturn($spy);
+    Log::shouldReceive('debug')->never();
+
+    $d = device();
+    $event = (new EventNormalizer)->fromStreamPayload(streamPayload(['subEventType' => 1]));
+
+    (new EventProcessor)->handle($event, $d, 'stream');
+
+    $spy->shouldHaveReceived('info');
 });

@@ -1,6 +1,7 @@
 <?php
 
 use App\Filament\Pages\DeviceMonitor;
+use App\Filament\Resources\Devices\Pages\CreateDevice;
 use App\Models\Corridor;
 use App\Models\Device;
 use App\Models\RawEvent;
@@ -98,4 +99,51 @@ it('shows the most recent raw events, newest first', function () {
 
     expect($events->first()->id)->toBe($newer->id);
     expect($events->last()->id)->toBe($older->id);
+});
+
+// The fleet is mixed: DS-K1A8603 (fingerprint only) and DS-K1T8005EFX
+// (fingerprint + proximity card). Showing the model tells an Officer
+// which corridors have a card reader a teacher might badge on and
+// wrongly believe they checked in.
+it('shows each terminal model on the device card', function () {
+    loginAsForMonitor('officer');
+
+    Device::factory()->for(Corridor::factory())->create([
+        'serial' => 'DEV0009001',
+        'model' => 'DS-K1T8005EFX',
+    ]);
+
+    Livewire::test(DeviceMonitor::class)->assertSee('DS-K1T8005EFX');
+});
+
+it('omits the model line for a device whose model was never recorded', function () {
+    loginAsForMonitor('officer');
+
+    Device::factory()->for(Corridor::factory())->create([
+        'serial' => 'DEV0009002',
+        'model' => null,
+    ]);
+
+    Livewire::test(DeviceMonitor::class)
+        ->assertSee('DEV0009002')
+        ->assertDontSee('DS-K1');
+});
+
+// The admin form is where a model gets recorded in the first place.
+it('saves the terminal model through the device form', function () {
+    loginAsForMonitor('admin');
+
+    $corridor = Corridor::factory()->create();
+
+    Livewire::test(CreateDevice::class)
+        ->fillForm([
+            'corridor_id' => $corridor->id,
+            'serial' => 'DEV0009003',
+            'model' => 'DS-K1T8005EFX',
+            'is_active' => true,
+        ])
+        ->call('create')
+        ->assertHasNoFormErrors();
+
+    expect(Device::where('serial', 'DEV0009003')->value('model'))->toBe('DS-K1T8005EFX');
 });

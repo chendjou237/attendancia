@@ -21,6 +21,10 @@ class DevicesTable
                 TextColumn::make('serial')
                     ->label(__('panel.common.serial'))
                     ->searchable(),
+                TextColumn::make('model')
+                    ->label(__('panel.resources.devices.model'))
+                    ->placeholder(__('panel.common.dash_placeholder'))
+                    ->searchable(),
                 TextColumn::make('ip')
                     ->label(__('panel.common.ip_address'))
                     ->searchable(),

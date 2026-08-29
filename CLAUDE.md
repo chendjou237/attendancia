@@ -24,6 +24,24 @@ Tests run on in-memory SQLite; production is MySQL 8. The suite needs more than
 PHP's default 128M (dompdf), so `phpunit.xml` raises `memory_limit` — if you run
 `vendor/bin/pest` directly, pass `-d memory_limit=512M`.
 
+**Local MySQL is on port 3307, not 3306.** Herd runs its own MySQL on 3306 that
+will reject this project's credentials with a confusing "Access denied" — check
+`DB_PORT` in `.env` before concluding the database is unreachable. `attendancia_test`
+is a disposable database granted to the same user; use it for anything
+destructive (`migrate:fresh`), never the `attendancia` database, which holds
+working demo data.
+
+```bash
+mysql -u attendancia -h 127.0.0.1 -P 3307 --protocol=TCP attendancia
+```
+
+**Verify migrations against MySQL, not just SQLite.** They diverge on foreign
+keys: MySQL auto-creates a backing index for every FK and refuses to drop the
+last index supporting one (errno 1553), while SQLite doesn't index FKs at all.
+A `down()` that rolls back cleanly on SQLite can still fail on MySQL — this has
+already happened once, see the comment in
+`database/migrations/2026_08_21_000000_add_pairing_index_to_raw_events_table.php`.
+
 `vendor/bin/pint --test` currently reports ~27 pre-existing failures in files
 untouched by recent work. Format only what you change; a repo-wide `pint` run
 would bury real edits in an unrelated diff.
@@ -78,6 +96,13 @@ These are load-bearing. Changes that break them corrupt a payroll input.
   to touch a report past `OfficerReviewed`.
 - **Every mutation of a computed record calls `AuditLog::record()`** with actor,
   before, after, and a reason.
+- **Attendance requires a fingerprint.** `EventProcessor` recognises
+  `majorEventType 5` sub-types `38` (fingerprint passed), `1` (card passed) and
+  `49` (failed). Only `38` resolves a `teacher_id`. Card support is a
+  *deliberate refusal*, not a gap: `PairingEngine` selects candidates by
+  `teacher_id`, so leaving it null is the only thing keeping a lendable
+  proximity card out of payroll. Do not widen `resolveTeacherId()`;
+  `tests/Feature/Attendance/CardVerificationTest.php` will fail if you do.
 - **Times are UTC; period slots are wall-clock.** Convert via
   `config('attendance.timezone')`. Always compare on
   `RawEvent::effectiveTime()` (device time, falling back to server time) — a
@@ -117,3 +142,8 @@ fixing over working around:
 3. **`ViewMonthlyReport`'s `regenerate`, `markReviewed` and `sendToHr` actions
    check state but not role**, so an `hr` user can advance the report workflow.
 4. **No CI.** ~4,000 lines of tests that nothing runs automatically.
+
+Hardware note: supported terminals are `DS-K1A8603` and `DS-K1T8005EFX`. They
+are identical over ISAPI; only the latter has a card reader. `devices.model` is
+free text (the fleet will grow models this code has not heard of) and nothing in
+the ingestion path branches on it.

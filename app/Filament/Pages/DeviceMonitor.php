@@ -65,7 +65,7 @@ class DeviceMonitor extends Page
         $this->selectedDeviceId = Device::query()->where('is_active', true)->value('id');
     }
 
-    /** @return Collection<int, array{id:int,serial:string,corridor:string,ip:?string,last_seen_at:?\Carbon\Carbon,status:string}> */
+    /** @return Collection<int, array{id:int,serial:string,model:?string,corridor:string,ip:?string,last_seen_at:?\Carbon\Carbon,status:string}> */
     public function getDevicesProperty(): Collection
     {
         $idleTimeout = (int) config('attendance.idle_timeout');
@@ -87,6 +87,7 @@ class DeviceMonitor extends Page
                 return [
                     'id' => $device->id,
                     'serial' => $device->serial,
+                    'model' => $device->model,
                     'corridor' => $device->corridor->name,
                     'ip' => $device->ip,
                     'is_active' => $device->is_active,

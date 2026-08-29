@@ -106,6 +106,8 @@ return [
         ],
 
         'devices' => [
+            'model' => 'Modèle',
+            'model_help' => 'Modèle du terminal, par ex. DS-K1T8005EFX. Les lecteurs de badge des modèles compatibles ne sont pas acceptés pour la présence — les enseignants doivent utiliser leur empreinte digitale.',
             'firmware' => 'Micrologiciel',
             'last_seen_at' => 'Dernière activité',
             'last_seen_at_help' => "Écrit par le processus d'ingestion — non modifiable ici.",

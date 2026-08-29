@@ -42,6 +42,9 @@
                         <div>
                             <div style="font-weight:600">{{ $device['serial'] }}</div>
                             <div style="font-size:0.8125rem;color:rgb(156 163 175)">{{ $device['corridor'] }}</div>
+                            @if ($device['model'])
+                                <div style="font-size:0.75rem;color:rgb(113 113 122);margin-top:2px">{{ $device['model'] }}</div>
+                            @endif
                             @if ($device['ip'])
                                 <div style="font-size:0.75rem;color:rgb(113 113 122);margin-top:2px">{{ $device['ip'] }}</div>
                             @endif

@@ -21,6 +21,14 @@ class DeviceForm
                 TextInput::make('serial')
                     ->label(__('panel.common.serial'))
                     ->required(),
+                // datalist, not a Select: the known models are
+                // suggestions, not a closed set — a corridor may get a
+                // terminal this codebase has never heard of, and that
+                // should still be recordable.
+                TextInput::make('model')
+                    ->label(__('panel.resources.devices.model'))
+                    ->datalist(['DS-K1T8005EFX', 'DS-K1A8603'])
+                    ->helperText(__('panel.resources.devices.model_help')),
                 TextInput::make('ip')
                     ->label(__('panel.common.ip_address')),
                 Toggle::make('is_active')

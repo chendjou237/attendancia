@@ -137,6 +137,8 @@ return [
         ],
 
         'devices' => [
+            'model' => 'Model',
+            'model_help' => 'Terminal model, e.g. DS-K1T8005EFX. Card readers on card-capable models are not accepted for attendance — teachers must use a fingerprint.',
             'firmware' => 'Firmware',
             'last_seen_at' => 'Last seen at',
             'last_seen_at_help' => 'Written by the ingestion worker — not editable here.',

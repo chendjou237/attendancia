@@ -160,6 +160,16 @@ Notes on the less obvious ones:
 
 ## 6. Configure the Hikvision device
 
+**Supported terminals:** `DS-K1A8603` series and `DS-K1T8005EFX`. Both speak
+identical ISAPI — same digest auth, same `AcsEvent` history endpoint, same
+`alertStream` listener — so nothing in the server configuration differs
+between them.
+
+They differ in what they physically accept. The `DS-K1T8005EFX` has a 125kHz
+EM proximity card reader alongside the fingerprint sensor. **Attendancia does
+not accept card scans** — see step 6 below, which is the important one on a
+card-capable terminal.
+
 Do this from a browser on the same LAN, using the device's own web UI
 (usually `http://<device-ip>`, default Hikvision admin credentials on first
 boot — change them immediately if you haven't already).
@@ -184,8 +194,31 @@ boot — change them immediately if you haven't already).
    models — check the device's storage/event log settings page. Write this
    number down; it caps how long an outage can last before scans are
    permanently lost (§1).
-6. **Note the device's serial number** — you'll need it for the admin panel
-   (§8) and for the Supervisor command line (§9).
+6. **On a card-capable terminal (`DS-K1T8005EFX`), disable card
+   authentication.** Set the verification mode to fingerprint only, and don't
+   issue proximity cards to teaching staff.
+
+   **Why this matters more than it looks.** A proximity card can be handed to
+   a colleague or cloned; a fingerprint can't, and these records become
+   payable hours — so the server refuses card scans outright. It stores them
+   as evidence and logs them, but they never pair into a session and never
+   count as taught time.
+
+   The problem is what the *teacher* sees. If the terminal still accepts
+   cards, it beeps and flashes green on a card swipe exactly as it does for a
+   fingerprint. A teacher walks away believing they checked in, and is later
+   marked Absent. That's a pay dispute the software cannot prevent, because
+   the misleading feedback comes from the device, not the server. Turning card
+   auth off at the terminal is what makes the refusal visible at the door,
+   where it can still be acted on.
+
+   If a card scan does reach the server, it lands in the `attendance` log
+   channel as `Card scan ignored — attendance requires a fingerprint`, with
+   the employee number — which is how you resolve the dispute after the fact.
+
+7. **Note the device's serial number** — you'll need it for the admin panel
+   (§8) and for the Supervisor command line (§9). Record the model there too,
+   so a mixed fleet is legible from the Device Monitor screen.
 
 **Before trusting any of this against the real pipeline**, run the
 reconnaissance command from the server once the app is installed:
