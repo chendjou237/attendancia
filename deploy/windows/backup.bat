@@ -15,7 +15,7 @@ REM the backup account can read, and point CREDENTIALS at it:
 REM
 REM   [client]
 REM   user=attendancia
-REM   password=...
+REM   password=honor123$
 REM
 REM There is no UPS on this server (§1). InnoDB survives abrupt shutdowns, but
 REM that is not a backup — write these somewhere that is not this disk.
@@ -39,7 +39,12 @@ set "DUMPFILE=%BACKUPDIR%\attendancia-%STAMP%.sql"
 REM --single-transaction takes a consistent snapshot without locking the
 REM tables, so an overnight scan arriving mid-dump is neither blocked nor
 REM half-captured.
-"%MYSQLDUMP%" --defaults-extra-file="%CREDENTIALS%" --single-transaction --routines --events "%DATABASE%" > "%DUMPFILE%"
+REM
+REM --no-tablespaces because the `attendancia` user is granted rights on its own
+REM database only (docs/setup.md §7) and has no server-wide PROCESS privilege.
+REM Without it mysqldump writes an "Access denied ... PROCESS" line to stderr on
+REM every run while still exiting 0 - a failure this script cannot detect.
+"%MYSQLDUMP%" --defaults-extra-file="%CREDENTIALS%" --single-transaction --routines --events --no-tablespaces "%DATABASE%" > "%DUMPFILE%"
 
 if errorlevel 1 (
     echo mysqldump failed with errorlevel %errorlevel% — leaving "%DUMPFILE%" in place for inspection.

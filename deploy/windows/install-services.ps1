@@ -34,7 +34,7 @@ $AppRoot   = 'C:\inetpub\attendancia'
 
 # The device serial for the corridor this worker watches. Must match a row in
 # the `devices` table exactly (docs/setup.md §6, §8).
-$Serial    = 'main-gate'
+$Serial    = 'DS-K1T8005EFX20241227V032520ENGB5874846'
 
 # Where service stdout/stderr goes. Created if missing.
 $LogDir    = 'C:\inetpub\attendancia\storage\logs'
