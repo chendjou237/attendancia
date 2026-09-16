@@ -83,10 +83,30 @@ it('marks too_short for two genuinely distinct scans that are not a double-tap',
     expect($session->anomaly_code)->toBe(SessionAnomaly::TooShort->value);
 });
 
+// The behaviour production actually gets: teachers check in and out on
+// whichever terminal is nearest, so a scan from another corridor pairs
+// exactly like one from the session's own corridor. No config() call
+// here on purpose — this asserts the shipped default, which is now a
+// hard false in config/attendance.php rather than an env lookup.
+it('pairs a scan taken on the nearest device, in another corridor, as a normal attendance', function () {
+    $f = AttendanceFixture::make();
+    $session = pairedSession($f);
+    $f->scanAt('07:28:00', device: $f->wrongDevice);
+    $f->scanAt('08:20:00', device: $f->wrongDevice);
+
+    (new PairingEngine)->pair($session, $f->rule);
+    $session->refresh();
+
+    expect($session->state)->toBe(SessionState::Paired);
+    expect($session->anomaly_code)->toBeNull();
+});
+
 // §11.1: a cover teacher's scan lands in a corridor they have no
-// scheduled lesson in — this must surface as a distinct anomaly, not a
-// plain "didn't scan". Only reachable with enforce_location on — see
-// the §7.4 tests further down for why that's not the pilot default.
+// scheduled lesson in — once a distinct anomaly, now unreachable in
+// production: enforce_location is a hard false, so only a runtime
+// config() override like this one still exercises the branch. Kept
+// because period_results written under the old rule still carry
+// location_mismatch and must keep reading back.
 it('marks location_mismatch when the only scan is at the wrong corridor and enforce_location is on', function () {
     config(['attendance.enforce_location' => true]);
     $f = AttendanceFixture::make();

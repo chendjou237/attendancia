@@ -52,8 +52,10 @@ class DemoSeeder extends Seeder
         $this->rooms = $roomsA->concat($roomsB)->all();
 
         // Beta: one physical device. A second corridor exists in the demo
-        // data so location_mismatch and multi-corridor timetables can be
-        // shown even though only one terminal is actually deployed.
+        // data so multi-corridor timetables can be shown even though only
+        // one terminal is actually deployed — a scan from either corridor
+        // now pairs the same way (corridor enforcement is retired, see
+        // config/attendance.php).
         $this->mainDevice = Device::create([
             'corridor_id' => $corridorA->id,
             'serial' => 'DS-K1T804-DEMO01',

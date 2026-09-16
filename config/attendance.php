@@ -17,21 +17,26 @@ return [
 
     /*
     |--------------------------------------------------------------------------
-    | §7.4 Location validation
+    | §7.4 Location validation — retired
     |--------------------------------------------------------------------------
     |
-    | Because each corridor has its own terminal, a scan carries location:
-    | a mismatch between the device a teacher scanned on and their
-    | expected session's corridor is a real fraud/error signal. But with
-    | one pilot device, most scans will legitimately come from teachers
-    | whose real classroom is a corridor that has no terminal yet — that
-    | isn't fraud, it's incomplete coverage. Off by default so the pilot
-    | doesn't drown in false anomalies; PairingEngine still logs what it
-    | would have flagged, so this can be tuned before more corridors are
-    | wired and the flag flips on.
+    | Originally a scan had to come from the terminal in the corridor of
+    | the teacher's expected session; anything else was read as a
+    | fraud/error signal. The school has since decided the opposite:
+    | teachers check in and out on whichever terminal is nearest, because
+    | walking back to "their" corridor to tap twice a session is the
+    | thing that actually stops people scanning at all.
+    |
+    | So this is now a hard false rather than an env lookup — a stale
+    | ATTENDANCE_ENFORCE_LOCATION=true left in a deployed .env must not
+    | be able to re-impose the restriction. The key itself is kept (and
+    | PairingEngine's filter with it) so the cross-corridor log line
+    | still has something to name, and so the LOCATION_MISMATCH enum
+    | cases stay meaningful for period_results already stored under the
+    | old rule.
     |
     */
-    'enforce_location' => env('ATTENDANCE_ENFORCE_LOCATION', false),
+    'enforce_location' => false,
 
     /*
     |--------------------------------------------------------------------------

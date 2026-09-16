@@ -206,7 +206,6 @@ DB_USERNAME=attendancia
 DB_PASSWORD=<a real password — not blank>
 
 ATTENDANCE_TIMEZONE=Africa/Douala
-ATTENDANCE_ENFORCE_LOCATION=false
 
 HIKVISION_USER=<the ISAPI account you create on the device in §6>
 HIKVISION_PASS=<its password>
@@ -217,12 +216,13 @@ HIKVISION_CLOCK_DRIFT_THRESHOLD=240
 
 Notes on the less obvious ones:
 
-- **`ATTENDANCE_ENFORCE_LOCATION`** — stays `false` for a single-device pilot.
-  With only one corridor wired, most scans will legitimately come from
-  teachers whose real classroom has no terminal yet; that's incomplete
-  coverage, not fraud. The pairing engine still logs what it *would* have
-  flagged, so you can review that log before switching this on once more
-  corridors are wired.
+- **`ATTENDANCE_ENFORCE_LOCATION`** — gone from the environment: teachers
+  check in and out on whichever terminal is nearest, so a scan is never
+  rejected for coming from the "wrong" corridor. `config/attendance.php`
+  now hard-codes `enforce_location => false` precisely so a leftover
+  `true` in a deployed `.env` cannot bring the restriction back. The
+  pairing engine still writes a cross-corridor line to the `attendance`
+  log channel, which is the only thing that flag now affects.
 - **`HIKVISION_BACKFILL_HOURS`** — how far back a backfill run looks by
   default. 48h comfortably covers an overnight outage or a restart. If the
   school has longer outages, raise this — but check it against the device's

@@ -197,6 +197,10 @@ return [
             'copy_current' => 'copy current',
             'save_timetable' => 'Save timetable',
             'no_timetable_version' => 'No timetable version exists yet for this teacher. Create one above.',
+            'close_version_valid_to' => 'Close on',
+            'close_version_button' => 'Close timetable',
+            'notification_version_closed' => 'Timetable closed — the previous version applies after this date',
+            'notification_recomputed' => 'Attendance recomputed for :count day(s). Dates more than :days days back are unchanged — run `php artisan attendance:compute <date> --teacher=:staff_no` for those.',
         ],
 
         'users' => [

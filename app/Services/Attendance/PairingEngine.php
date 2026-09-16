@@ -37,13 +37,15 @@ use Illuminate\Support\Facades\Log;
  *     the scan-in of the next; nothing here marks an event "consumed"
  *   - a paired interval shorter than min_session_minutes is UNPAIRED, not
  *     a valid (if suspiciously brief) attendance
- *   - §7.4: corridor matching is only enforced when
- *     config('attendance.enforce_location') is on (production, once
- *     every corridor has its own terminal). Off by default for the
- *     single-device pilot — see the config file for why — but a
- *     cross-corridor match is still logged so the gap between "how
- *     often this would fire" and "how often it should fire" can be
- *     seen before flipping the flag.
+ *   - §7.4 (retired): corridor matching is no longer enforced. Teachers
+ *     scan on whichever terminal is nearest, so a scan from another
+ *     corridor pairs exactly like one from the session's own corridor.
+ *     config('attendance.enforce_location') is now a hard false (see the
+ *     config file for why it is a constant rather than an env lookup),
+ *     which leaves the filter below and the LocationMismatch branch
+ *     unreachable in practice; both are kept so period_results written
+ *     under the old rule still read back, and the cross-corridor log
+ *     line still records where a teacher actually tapped.
  */
 class PairingEngine
 {

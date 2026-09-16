@@ -166,6 +166,10 @@ return [
             'copy_current' => 'copier la version actuelle',
             'save_timetable' => "Enregistrer l'emploi du temps",
             'no_timetable_version' => "Aucun emploi du temps n'existe encore pour cet enseignant. Créez-en un ci-dessus.",
+            'close_version_valid_to' => 'Clôturer le',
+            'close_version_button' => "Clôturer l'emploi du temps",
+            'notification_version_closed' => "Emploi du temps clôturé — la version précédente s'applique après cette date",
+            'notification_recomputed' => "Présences recalculées pour :count jour(s). Les dates antérieures à :days jours sont inchangées — utilisez `php artisan attendance:compute <date> --teacher=:staff_no` pour celles-ci.",
         ],
 
         'users' => [

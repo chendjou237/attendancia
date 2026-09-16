@@ -4,6 +4,7 @@ namespace App\Filament\Resources\Teachers\Pages;
 
 use App\Enums\TimetableState;
 use App\Filament\Resources\Teachers\TeacherResource;
+use App\Models\AuditLog;
 use App\Models\ClassCode;
 use App\Models\PeriodSlot;
 use App\Models\Room;
@@ -12,7 +13,9 @@ use App\Models\TimetableVersion;
 use Filament\Notifications\Notification;
 use Filament\Resources\Pages\Concerns\InteractsWithRecord;
 use Filament\Resources\Pages\Page;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\DB;
 
 /**
@@ -32,6 +35,15 @@ class ManageTimetable extends Page
     /** Monday .. Saturday. Carbon convention: 0 = Sunday .. 6 = Saturday. */
     public const DAYS = [1, 2, 3, 4, 5, 6];
 
+    /**
+     * How far back a timetable change recomputes already-stored
+     * period_results. A version backdated to the start of term would
+     * otherwise fire hundreds of attendance:compute runs inside one web
+     * request; anything older than that is a deliberate command-line
+     * job, and the notification says so.
+     */
+    public const RECOMPUTE_WINDOW_DAYS = 14;
+
     /** Exposed for the Blade view — `self::` doesn't resolve there. */
     public array $days = self::DAYS;
 
@@ -50,12 +62,15 @@ class ManageTimetable extends Page
 
     public string $newVersionValidFrom = '';
 
+    public string $closeValidTo = '';
+
     public function mount(int|string $record): void
     {
         $this->record = $this->resolveRecord($record);
-        $this->versions = $this->record->timetableVersions()->orderByDesc('valid_from')->get();
+        $this->versions = $this->loadVersions();
         $this->versionId = $this->versions->first()?->id;
         $this->newVersionValidFrom = now()->toDateString();
+        $this->closeValidTo = now()->toDateString();
 
         $this->loadGrid();
     }
@@ -101,11 +116,14 @@ class ManageTimetable extends Page
             }
         }
 
-        $this->versions = $this->record->timetableVersions()->orderByDesc('valid_from')->get();
+        $this->versions = $this->loadVersions();
         $this->versionId = $version->id;
         $this->loadGrid();
 
-        Notification::make()->title(__('panel.resources.teachers.notification_version_created'))->success()->send();
+        $this->notifyRecomputed(
+            __('panel.resources.teachers.notification_version_created'),
+            $this->recomputeFor($version),
+        );
     }
 
     private function loadGrid(): void
@@ -194,7 +212,124 @@ class ManageTimetable extends Page
             }
         });
 
-        Notification::make()->title(__('panel.resources.teachers.notification_timetable_saved'))->success()->send();
+        $this->notifyRecomputed(
+            __('panel.resources.teachers.notification_timetable_saved'),
+            $this->recomputeFor(TimetableVersion::find($this->versionId)),
+        );
+    }
+
+    /**
+     * Ends a timetable without deleting it: valid_to closes the version's
+     * window, so timetableVersionFor() falls through to whatever version
+     * covers the dates after it (§14 — a superseded grid is never
+     * destroyed, only closed). Deliberately a separate button rather than
+     * something createVersion() does silently, because closing a grid
+     * changes which periods a teacher was expected to teach, and that is
+     * a decision someone makes on purpose.
+     */
+    public function closeVersion(): void
+    {
+        $version = TimetableVersion::find($this->versionId);
+
+        if ($version === null) {
+            return;
+        }
+
+        $this->validate([
+            'closeValidTo' => ['required', 'date', 'after_or_equal:'.$version->valid_from->toDateString()],
+        ]);
+
+        $before = ['valid_to' => $version->valid_to?->toDateString()];
+
+        $version->valid_to = $this->closeValidTo;
+        $version->save();
+
+        AuditLog::record(
+            'timetable_versions',
+            $version->id,
+            'closed',
+            $before,
+            ['valid_to' => $version->valid_to->toDateString()],
+        );
+
+        $this->versions = $this->loadVersions();
+        $this->loadGrid();
+
+        $this->notifyRecomputed(
+            __('panel.resources.teachers.notification_version_closed'),
+            $this->recomputeFor($version, throughToday: true),
+        );
+    }
+
+    /** @return Collection<int, TimetableVersion> */
+    private function loadVersions(): Collection
+    {
+        // Same ordering as Teacher::timetableVersionFor(), id included:
+        // the version this screen shows first must be the one attendance
+        // actually computes against, even when two share a valid_from.
+        return $this->record->timetableVersions()
+            ->orderByDesc('valid_from')
+            ->orderByDesc('id')
+            ->get();
+    }
+
+    /**
+     * Recomputes already-stored attendance over the dates a changed
+     * version governs, so Teacher Attendance reflects the new grid
+     * without anyone running the command by hand — the same
+     * Artisan::call pattern the calendar-day pages use, scoped to this
+     * teacher.
+     *
+     * Only rewrites results for slots the grid still contains: a slot
+     * dropped from the timetable keeps its old row, because
+     * SessionBuilder::persist() never deletes sessions and
+     * PeriodResultWriter only supersedes what it rewrites.
+     *
+     * $throughToday widens the range past the version's own valid_to,
+     * which is what closing a grid needs: the days after the closing
+     * date are handed back to whichever version covers them, so they are
+     * every bit as stale as the days inside the window.
+     *
+     * @return int number of dates recomputed
+     */
+    private function recomputeFor(?TimetableVersion $version, bool $throughToday = false): int
+    {
+        if ($version === null) {
+            return 0;
+        }
+
+        $today = Carbon::today();
+        $from = Carbon::parse($version->valid_from->toDateString())
+            ->max($today->clone()->subDays(self::RECOMPUTE_WINDOW_DAYS));
+        $to = ($version->valid_to !== null && ! $throughToday)
+            ? Carbon::parse($version->valid_to->toDateString())->min($today)
+            : $today->clone();
+
+        $recomputed = 0;
+
+        for ($date = $from->clone(); $date->lessThanOrEqualTo($to); $date->addDay()) {
+            Artisan::call('attendance:compute', [
+                'date' => $date->toDateString(),
+                '--teacher' => [$this->record->staff_no],
+            ]);
+
+            $recomputed++;
+        }
+
+        return $recomputed;
+    }
+
+    private function notifyRecomputed(string $title, int $recomputed): void
+    {
+        Notification::make()
+            ->title($title)
+            ->body(__('panel.resources.teachers.notification_recomputed', [
+                'count' => $recomputed,
+                'days' => self::RECOMPUTE_WINDOW_DAYS,
+                'staff_no' => $this->record->staff_no,
+            ]))
+            ->success()
+            ->send();
     }
 
     /** @return Collection<int, ClassCode> */
