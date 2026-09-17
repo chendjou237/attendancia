@@ -250,6 +250,15 @@ return [
 
     ],
 
+    'actions' => [
+        'recompute' => [
+            'label' => 'Recompute attendance',
+            'description' => 'Re-derives this day from the scans already recorded. Manual overrides are never touched.',
+            'all_teachers' => 'All teachers',
+            'notification' => 'Attendance recomputed for :date (:scope)',
+        ],
+    ],
+
     'pages' => [
 
         'exception_queue' => [
@@ -312,6 +321,10 @@ return [
             'devices_reporting' => 'Devices reporting',
             'devices_silent' => 'One or more silent for 2h+',
             'devices_all_active' => 'All active devices seen recently',
+            'last_computed' => 'Last computed',
+            'last_computed_never' => 'Never',
+            'last_computed_fresh' => 'Attendance is up to date with the scans received',
+            'last_computed_stale' => 'No computation in over :minutes minutes — check the scheduler service',
             'current_report' => "This month's report",
             'current_report_not_generated' => 'Not generated',
             'current_report_description' => 'Click to open Monthly Reports',

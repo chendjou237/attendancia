@@ -219,6 +219,15 @@ return [
 
     ],
 
+    'actions' => [
+        'recompute' => [
+            'label' => 'Recalculer les présences',
+            'description' => 'Recalcule la journée à partir des pointages déjà enregistrés. Les corrections manuelles ne sont jamais modifiées.',
+            'all_teachers' => 'Tous les enseignants',
+            'notification' => 'Présences recalculées pour le :date (:scope)',
+        ],
+    ],
+
     'pages' => [
 
         'exception_queue' => [
@@ -281,6 +290,10 @@ return [
             'devices_reporting' => 'Appareils actifs',
             'devices_silent' => 'Un ou plusieurs silencieux depuis 2h+',
             'devices_all_active' => 'Tous les appareils actifs vus récemment',
+            'last_computed' => 'Dernier calcul',
+            'last_computed_never' => 'Jamais',
+            'last_computed_fresh' => 'Les présences sont à jour avec les pointages reçus',
+            'last_computed_stale' => "Aucun calcul depuis plus de :minutes minutes — vérifiez le service du planificateur",
             'current_report' => 'Rapport de ce mois',
             'current_report_not_generated' => 'Pas encore généré',
             'current_report_description' => 'Cliquer pour ouvrir les rapports mensuels',

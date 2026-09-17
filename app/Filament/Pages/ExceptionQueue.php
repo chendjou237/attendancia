@@ -4,6 +4,7 @@ namespace App\Filament\Pages;
 
 use App\Enums\PeriodStatus;
 use App\Enums\SessionAnomaly;
+use App\Filament\Actions\RecomputeAttendanceAction;
 use App\Models\AuditLog;
 use App\Models\PeriodResult;
 use BackedEnum;
@@ -57,6 +58,12 @@ class ExceptionQueue extends Page implements HasTable
     public function getTitle(): string|Htmlable
     {
         return __('panel.nav.exception_queue');
+    }
+
+    /** @return array<int, Action> */
+    protected function getHeaderActions(): array
+    {
+        return [RecomputeAttendanceAction::make()];
     }
 
     public function content(Schema $schema): Schema

@@ -167,7 +167,12 @@
                     <tbody>
                         @forelse ($this->recentEvents as $event)
                             <tr wire:key="raw-event-{{ $event->id }}" class="device-monitor-row-enter" style="border-bottom:1px solid rgb(39 39 42)">
-                                <td style="padding:0.5rem;white-space:nowrap">{{ $event->effectiveTime()->format('H:i:s') }}</td>
+                                {{-- School wall clock, not UTC: raw_events are stored in UTC
+                                     (config/app.php), so formatting the Carbon as-is showed staff
+                                     a time an hour off the clock on the wall — which reads as
+                                     device clock drift and sends every "he scanned at 14:49"
+                                     conversation down the wrong path. --}}
+                                <td style="padding:0.5rem;white-space:nowrap">{{ $event->effectiveTime()->setTimezone(config('attendance.timezone'))->format('H:i:s') }}</td>
                                 <td style="padding:0.5rem">{{ $event->device?->serial ?? $event->device_serial }}</td>
                                 <td style="padding:0.5rem">
                                     @if ($event->teacher)

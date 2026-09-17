@@ -62,7 +62,7 @@ The same five components either way; only the packaging differs.
 | MySQL 8 (or MariaDB 10.6+) | The database | distro package | MySQL Installer for Windows |
 | A web server | Serves the admin panel over HTTP on the school LAN | Nginx + PHP-FPM (or Caddy) | IIS + FastCGI (or Apache) |
 | A process supervisor | Keeps `hikvision:stream` running and restarts it if it dies | Supervisor | NSSM |
-| A scheduler | Fires Laravel's scheduler, which runs the nightly backfill | cron, once a minute | a second NSSM service running `schedule:work` |
+| A scheduler | Fires Laravel's scheduler, which recomputes attendance through the day and runs the nightly backfill | cron, once a minute | a second NSSM service running `schedule:work` |
 
 There is **no Redis and no queue worker to run** — sessions, cache, and queue
 all use plain database drivers (see `.env.example`), which is one less service
@@ -659,17 +659,55 @@ install script again with a different `$Serial` and `$StreamSvc`.
 
 ---
 
-## 13. The nightly backfill and recompute
+## 13. The scheduled recompute
 
-At `02:00` local time, `routes/console.php` runs `NightlyRecovery`: a
+Attendance does not exist until `attendance:compute` has run. A scan
+landing in `raw_events` recomputes nothing by itself — the stream worker
+stores the row and returns — so **everything on the Exception Queue and
+Teacher Attendance screens is only as current as the last scheduled
+run.** Two entries in `routes/console.php` drive it.
+
+**Every ten minutes, 06:00–20:00 school time** (`attendance-compute-today`):
+`attendance:compute` for the current date. Without this, a scan made
+during the school day would not become a `period_result` until 02:00 the
+next morning, and staff watching teachers tap in front of them would see
+a full day of "no scan-in". If the panel's **Dernier calcul** stat on the
+dashboard goes red, this is what has stopped.
+
+**At `02:00` school time** (`hikvision-nightly-backfill`), `NightlyRecovery`: a
 backfill for every active device, then `attendance:compute` for today and
 yesterday. Backfill alone only recovers `raw_events` — this second half is
 what turns a routine overnight outage into finished `period_results`
 without anyone having to notice the gap and re-run the engine by hand. A
-longer outage (more than a day) needs a human to run `attendance:compute
---date=YYYY-MM-DD` for each earlier affected day once it's noticed, the
-same way it already needs `hikvision:backfill --hours=N` for a window
-longer than the default 48h.
+longer outage (more than a day) leaves dates that nothing revisits: catch
+them up with one range, the same way a window longer than the default 48h
+needs `hikvision:backfill --hours=N`.
+
+```bash
+php artisan attendance:compute --from=2026-09-01 --to=2026-09-17
+php artisan attendance:compute --from=2026-09-01 --to=2026-09-17 --teacher=T042
+```
+
+Recomputing is safe to repeat: every stage upserts on a natural key,
+manual overrides are never touched, and `MonthlyReportGenerator` still
+refuses to alter a report past `OfficerReviewed`.
+
+When a teacher insists they scanned and the panel disagrees,
+`attendance:explain` answers it without a database console. It writes
+nothing:
+
+```bash
+php artisan attendance:explain 2026-09-17 --teacher=T042
+```
+
+It prints each expected session, its pairing window in both school wall
+clock and UTC, every scan resolved to that teacher that day, and the
+stored status — which separates "nobody scanned", "the scan fell outside
+the window", and "no compute has run for this date".
+
+Staff with the **admin** or **officer** role can also re-run one day from
+the panel: the **Recalculer les présences** button in the header of the
+Exception Queue and Teacher Attendance screens. It is audited.
 
 This is driven by Laravel's own scheduler, which has to be running.
 

@@ -81,6 +81,19 @@ Ingestion has two paths — the live `hikvision:stream` worker and the
 filtering or normalisation logic to either path; it belongs in `EventProcessor`
 or `EventNormalizer` so the two cannot drift apart.
 
+Nothing in that pipeline is triggered by a scan arriving. `EventProcessor`
+stores the `raw_events` row and returns — there are no jobs, events or
+observers — so `period_results` only exist where `attendance:compute` has
+run. Two scheduled entries in `routes/console.php` drive it: the current
+date every ten minutes through the school day, and `NightlyRecovery` at
+02:00 (backfill, then today and yesterday). Anything older than that
+window is never revisited automatically; `attendance:compute --from= --to=`
+is the catch-up, and `attendance:explain <date> --teacher=` says why one
+teacher's day paired the way it did without writing anything. If you add
+another path that changes an input to the pipeline (a timetable, a
+calendar day), recompute the affected dates from it — a stale
+`period_result` is invisible to the people reading the panel.
+
 The Filament admin panel at `/admin` is the only UI. Three custom pages
 (`ExceptionQueue`, `TeacherAttendance`, `DeviceMonitor`) sit alongside the
 generated resources.

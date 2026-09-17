@@ -4,8 +4,10 @@ namespace App\Filament\Pages;
 
 use App\Enums\PeriodStatus;
 use App\Enums\SessionAnomaly;
+use App\Filament\Actions\RecomputeAttendanceAction;
 use App\Models\PeriodResult;
 use BackedEnum;
+use Filament\Actions\Action;
 use Filament\Forms\Components\DatePicker;
 use Filament\Pages\Page;
 use Filament\Schemas\Components\EmbeddedTable;
@@ -64,6 +66,12 @@ class TeacherAttendance extends Page implements HasTable
     public function getTitle(): string|Htmlable
     {
         return __('panel.nav.teacher_attendance');
+    }
+
+    /** @return array<int, Action> */
+    protected function getHeaderActions(): array
+    {
+        return [RecomputeAttendanceAction::make()];
     }
 
     public function content(Schema $schema): Schema
