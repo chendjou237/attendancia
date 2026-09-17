@@ -147,3 +147,69 @@ it('saves the terminal model through the device form', function () {
 
     expect(Device::where('serial', 'DEV0009003')->value('model'))->toBe('DS-K1T8005EFX');
 });
+
+// 25 rows was under ten actual people: every tap also emits companion
+// events the device reports under other sub-types, so the feed filled
+// before it could answer "did this teacher scan, and when?".
+it('shows a longer feed than the old 25 rows by default', function () {
+    loginAsForMonitor('admin');
+
+    $device = Device::factory()->for(Corridor::factory())->create();
+    for ($i = 1; $i <= 40; $i++) {
+        RawEvent::factory()->create([
+            'device_id' => $device->id,
+            'device_serial' => $device->serial,
+            'device_event_serial' => $i,
+        ]);
+    }
+
+    expect(Livewire::test(DeviceMonitor::class)->get('recentEvents'))->toHaveCount(40);
+});
+
+it('lets the viewer pick how many rows to show', function () {
+    loginAsForMonitor('admin');
+
+    $device = Device::factory()->for(Corridor::factory())->create();
+    for ($i = 1; $i <= 30; $i++) {
+        RawEvent::factory()->create([
+            'device_id' => $device->id,
+            'device_serial' => $device->serial,
+            'device_event_serial' => $i,
+        ]);
+    }
+
+    $component = Livewire::test(DeviceMonitor::class)->set('feedLimit', 25);
+
+    expect($component->get('recentEvents'))->toHaveCount(25);
+});
+
+// Livewire properties come from the browser: an arbitrary limit must not
+// become an unbounded query against an append-only table.
+it('ignores a row count it does not offer', function () {
+    loginAsForMonitor('admin');
+
+    $component = Livewire::test(DeviceMonitor::class)->set('feedLimit', 999999);
+
+    expect($component->instance()->resolvedFeedLimit())->toBe(DeviceMonitor::DEFAULT_FEED_LIMIT);
+});
+
+it('can hide everything no fingerprint resolved to a teacher', function () {
+    loginAsForMonitor('admin');
+
+    $device = Device::factory()->for(Corridor::factory())->create();
+    $teacher = Teacher::factory()->create();
+    $identified = RawEvent::factory()->create([
+        'device_id' => $device->id, 'device_serial' => $device->serial,
+        'device_event_serial' => 1, 'teacher_id' => $teacher->id,
+    ]);
+    RawEvent::factory()->create([
+        'device_id' => $device->id, 'device_serial' => $device->serial,
+        'device_event_serial' => 2, 'teacher_id' => null,
+    ]);
+
+    $component = Livewire::test(DeviceMonitor::class);
+    expect($component->get('recentEvents'))->toHaveCount(2);
+
+    $component->set('onlyIdentified', true);
+    expect($component->get('recentEvents')->pluck('id')->all())->toBe([$identified->id]);
+});

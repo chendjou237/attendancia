@@ -149,12 +149,33 @@
 
         {{-- Live activity feed --}}
         <x-filament::card>
-            <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:0.75rem">
+            <div style="display:flex;align-items:center;justify-content:space-between;gap:1rem;flex-wrap:wrap;margin-bottom:0.75rem">
                 <div style="font-weight:600">{{ __('panel.pages.device_monitor.live_activity') }}</div>
-                <div style="font-size:0.75rem;color:rgb(113 113 122)">{{ __('panel.pages.device_monitor.updates_every_3s') }}</div>
+
+                <div style="display:flex;align-items:center;gap:1rem;flex-wrap:wrap">
+                    <label style="display:flex;align-items:center;gap:0.375rem;font-size:0.75rem;color:rgb(113 113 122)">
+                        <input type="checkbox" wire:model.live="onlyIdentified" />
+                        {{ __('panel.pages.device_monitor.only_identified') }}
+                    </label>
+
+                    <label style="display:flex;align-items:center;gap:0.375rem;font-size:0.75rem;color:rgb(113 113 122)">
+                        {{ __('panel.pages.device_monitor.rows_shown') }}
+                        <x-filament::input.wrapper>
+                            <x-filament::input.select wire:model.live="feedLimit">
+                                @foreach (\App\Filament\Pages\DeviceMonitor::FEED_LIMITS as $size)
+                                    <option value="{{ $size }}">{{ $size }}</option>
+                                @endforeach
+                            </x-filament::input.select>
+                        </x-filament::input.wrapper>
+                    </label>
+
+                    <div style="font-size:0.75rem;color:rgb(113 113 122)">{{ __('panel.pages.device_monitor.updates_every_3s') }}</div>
+                </div>
             </div>
 
-            <div style="overflow-x:auto">
+            {{-- Capped height with its own scroll: 500 rows must not push
+                 the device cards off the top of the page every poll. --}}
+            <div style="overflow-x:auto;overflow-y:auto;max-height:36rem">
                 <table style="width:100%;border-collapse:collapse;font-size:0.875rem">
                     <thead>
                         <tr style="text-align:left;border-bottom:1px solid rgb(63 63 70)">
@@ -172,7 +193,16 @@
                                      a time an hour off the clock on the wall — which reads as
                                      device clock drift and sends every "he scanned at 14:49"
                                      conversation down the wrong path. --}}
-                                <td style="padding:0.5rem;white-space:nowrap">{{ $event->effectiveTime()->setTimezone(config('attendance.timezone'))->format('H:i:s') }}</td>
+                                @php($localTime = $event->effectiveTime()->setTimezone(config('attendance.timezone')))
+                                <td style="padding:0.5rem;white-space:nowrap">
+                                    {{ $localTime->format('H:i:s') }}
+                                    {{-- The date only when it isn't today: a longer feed reaches
+                                         back past midnight, and a bare clock time there reads as
+                                         a scan that just happened. --}}
+                                    @unless ($localTime->isToday())
+                                        <span style="color:rgb(156 163 175)">{{ $localTime->format('d/m') }}</span>
+                                    @endunless
+                                </td>
                                 <td style="padding:0.5rem">{{ $event->device?->serial ?? $event->device_serial }}</td>
                                 <td style="padding:0.5rem">
                                     @if ($event->teacher)
@@ -194,7 +224,9 @@
                         @empty
                             <tr>
                                 <td colspan="4" style="padding:1rem;text-align:center;color:rgb(156 163 175)">
-                                    {{ __('panel.pages.device_monitor.no_scans_yet') }}
+                                    {{ $onlyIdentified
+                                        ? __('panel.pages.device_monitor.no_identified_scans')
+                                        : __('panel.pages.device_monitor.no_scans_yet') }}
                                 </td>
                             </tr>
                         @endforelse
