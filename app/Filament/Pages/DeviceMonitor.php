@@ -45,6 +45,27 @@ class DeviceMonitor extends Page
 
     public ?int $selectedEnrolmentId = null;
 
+    /**
+     * How many rows the live feed shows. 25 was too short to answer the
+     * question staff actually bring to this page — "did this teacher
+     * scan, and when?" — because a single busy period between classes
+     * fills it, and every scan also emits companion events the device
+     * reports under other sub-types, so 25 rows can be well under ten
+     * actual people.
+     */
+    public int $feedLimit = self::DEFAULT_FEED_LIMIT;
+
+    /**
+     * Hides the events no fingerprint resolved: the device's own
+     * heartbeats and the companion rows around each tap, which crowd out
+     * the scans when you are reading the feed to see who came through.
+     */
+    public bool $onlyIdentified = false;
+
+    public const FEED_LIMITS = [25, 50, 100, 250, 500];
+
+    public const DEFAULT_FEED_LIMIT = 100;
+
     public static function canAccess(): bool
     {
         return auth()->user()?->hasAnyRole(['admin', 'officer']) ?? false;
@@ -65,7 +86,7 @@ class DeviceMonitor extends Page
         $this->selectedDeviceId = Device::query()->where('is_active', true)->value('id');
     }
 
-    /** @return Collection<int, array{id:int,serial:string,corridor:string,ip:?string,last_seen_at:?\Carbon\Carbon,status:string}> */
+    /** @return Collection<int, array{id:int,serial:string,model:?string,corridor:string,ip:?string,last_seen_at:?\Carbon\Carbon,status:string}> */
     public function getDevicesProperty(): Collection
     {
         $idleTimeout = (int) config('attendance.idle_timeout');
@@ -87,6 +108,7 @@ class DeviceMonitor extends Page
                 return [
                     'id' => $device->id,
                     'serial' => $device->serial,
+                    'model' => $device->model,
                     'corridor' => $device->corridor->name,
                     'ip' => $device->ip,
                     'is_active' => $device->is_active,
@@ -96,14 +118,37 @@ class DeviceMonitor extends Page
             });
     }
 
-    /** @return Collection<int, RawEvent> */
+    /**
+     * Ordered by id, not by scan time: id is the insertion order and is
+     * indexed, which keeps a feed that polls every three seconds off a
+     * filesort over an append-only table that only ever grows. For live
+     * events the two orders are the same; a backfill is the exception,
+     * and there the ingestion order is arguably the more useful thing to
+     * see — those rows appearing at the top is the backfill landing.
+     *
+     * @return Collection<int, RawEvent>
+     */
     public function getRecentEventsProperty(): Collection
     {
         return RawEvent::query()
             ->with(['teacher', 'device'])
+            ->when($this->onlyIdentified, fn ($q) => $q->whereNotNull('teacher_id'))
             ->latest('id')
-            ->limit(25)
+            ->limit($this->resolvedFeedLimit())
             ->get();
+    }
+
+    /**
+     * Livewire properties come from the browser, so the limit is a value
+     * a viewer can set to anything. Only the offered sizes are honoured;
+     * anything else falls back to the default rather than becoming an
+     * unbounded query against raw_events.
+     */
+    public function resolvedFeedLimit(): int
+    {
+        return in_array($this->feedLimit, self::FEED_LIMITS, true)
+            ? $this->feedLimit
+            : self::DEFAULT_FEED_LIMIT;
     }
 
     /** @return Collection<int, TeacherBiometricId> */

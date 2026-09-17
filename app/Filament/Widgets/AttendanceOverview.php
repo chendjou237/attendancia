@@ -27,6 +27,14 @@ class AttendanceOverview extends StatsOverviewWidget
     protected ?string $pollingInterval = '60s';
 
     /**
+     * How old the newest period_result may be before the dashboard calls
+     * the computation stale. The in-day schedule runs every ten minutes,
+     * so thirty is three missed passes — late enough not to flicker on a
+     * slow run, early enough to catch a dead scheduler the same morning.
+     */
+    private const STALE_COMPUTE_MINUTES = 30;
+
+    /**
      * These stats are live, in-progress numbers — pending exceptions,
      * this month's running present/absent/hours before any report has
      * been approved. HR's whole job is reading the *frozen*, approved
@@ -69,6 +77,17 @@ class AttendanceOverview extends StatsOverviewWidget
         $currentReport = MonthlyReport::query()->where('month', $month->copy()->startOfMonth()->toDateString())->first();
         $reportState = $currentReport?->state ?? null;
 
+        // Attendance is only as current as the last attendance:compute
+        // run, and nothing on any screen used to say when that was. A
+        // stopped scheduler is otherwise indistinguishable from a day on
+        // which nobody scanned: the queue simply fills with "no scan-in"
+        // while staff watch teachers tap in front of them. Stale here
+        // means the in-day schedule (every ten minutes, routes/console
+        // .php) is not running.
+        $lastComputedAt = PeriodResult::max('computed_at');
+        $lastComputedAt = $lastComputedAt !== null ? Carbon::parse($lastComputedAt) : null;
+        $computeIsStale = $lastComputedAt === null || $lastComputedAt->lessThan(now()->subMinutes(self::STALE_COMPUTE_MINUTES));
+
         return [
             Stat::make(__('panel.widgets.attendance_overview.pending_exceptions'), $pending)
                 ->description($pending > 0
@@ -105,6 +124,16 @@ class AttendanceOverview extends StatsOverviewWidget
                 ->descriptionIcon(Heroicon::OutlinedDocumentChartBar)
                 ->color($reportState === ReportState::SentToHr ? 'success' : 'gray')
                 ->url(MonthlyReportResource::getUrl()),
+
+            Stat::make(
+                __('panel.widgets.attendance_overview.last_computed'),
+                $lastComputedAt?->diffForHumans() ?? __('panel.widgets.attendance_overview.last_computed_never'),
+            )
+                ->description($computeIsStale
+                    ? __('panel.widgets.attendance_overview.last_computed_stale', ['minutes' => self::STALE_COMPUTE_MINUTES])
+                    : __('panel.widgets.attendance_overview.last_computed_fresh'))
+                ->descriptionIcon($computeIsStale ? Heroicon::OutlinedExclamationTriangle : Heroicon::OutlinedArrowPath)
+                ->color($computeIsStale ? 'danger' : 'success'),
         ];
     }
 }

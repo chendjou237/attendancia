@@ -18,12 +18,28 @@ use Illuminate\Support\Facades\Log;
  *   majorEventType 5           -> process
  *   majorEventType 2, 3        -> ignore (device/network system events)
  *   subEventType 38 (passed)   -> store, resolve teacher_id
+ *   subEventType 1  (card)     -> store, log only, NO teacher resolution
  *   subEventType 49 (failed)   -> store, log only, no teacher resolution
  *   eventType videoloss        -> heartbeat, no ACS payload, liveness only
+ *
+ * Card verification (subEventType 1) arrives from the DS-K1T8005EFX,
+ * whose "E" designation adds a 125kHz EM proximity card reader
+ * alongside the fingerprint sensor. This answers what the code used to
+ * call open question #2 — the sub-type is now known, and the answer is
+ * that attendance deliberately does not accept it. A proximity card can
+ * be lent to a colleague or cloned; a fingerprint cannot, and these
+ * records become payable hours. So a card event is stored as evidence
+ * that someone badged in, and stops there.
  */
 class EventProcessor
 {
     private const SUB_EVENT_PASSED = 38;
+
+    /**
+     * Card verification passed. Recognised so it can be refused
+     * explicitly and logged for what it is — not accepted.
+     */
+    private const SUB_EVENT_CARD_PASSED = 1;
 
     private const SUB_EVENT_FAILED = 49;
 
@@ -94,12 +110,26 @@ class EventProcessor
             return;
         }
 
+        if ($event->subEventType === self::SUB_EVENT_CARD_PASSED) {
+            // Info, not debug, and on the attendance channel: this is a
+            // real person who believes they just checked in. When a
+            // teacher disputes an absence, this line is the evidence
+            // that they badged rather than scanned.
+            Log::channel('attendance')->info('Card scan ignored — attendance requires a fingerprint', [
+                'raw_event_id' => $raw->id,
+                'device_id' => $device->id,
+                'source' => $source,
+                'biometric_id' => $event->biometricId,
+            ]);
+
+            return;
+        }
+
         if ($event->subEventType !== self::SUB_EVENT_PASSED) {
-            // Open question #2 (§13): card/face credentials also arrive
-            // under majorEventType 5 with sub-types the allowlist
-            // doesn't know about yet. Logged at debug with the full
-            // payload so those codes can be read off once a real device
-            // is available, rather than silently dropped.
+            // Face credentials, and anything else this firmware emits
+            // under majorEventType 5, still land here: stored, logged
+            // with the full payload so the code can be identified, and
+            // never resolved to a teacher on a guess.
             Log::debug('EventProcessor: unrecognised sub_event_type under majorEventType 5', [
                 'raw_event_id' => $raw->id,
                 'sub_event_type' => $event->subEventType,
@@ -109,9 +139,19 @@ class EventProcessor
     }
 
     /**
-     * Only a passed scan (subEventType 38) ever resolves to a teacher —
-     * a failed or unrecognised event must never end up attributed to
-     * one just because its biometric_id happens to match.
+     * Only a passed FINGERPRINT scan (subEventType 38) ever resolves to
+     * a teacher — a failed, card, or unrecognised event must never end
+     * up attributed to one just because its biometric_id happens to
+     * match.
+     *
+     * This single condition is what keeps card scans out of payroll.
+     * PairingEngine::pair() selects candidate events by teacher_id, so
+     * an event with teacher_id null can never be paired into a session
+     * and can never become a Present. Widening this to accept
+     * SUB_EVENT_CARD_PASSED would silently make every card swipe count
+     * as taught time — which is the decision this class exists to
+     * refuse. tests/Feature/Hikvision/EventProcessorTest.php holds it
+     * down end to end.
      */
     private function resolveTeacherId(NormalizedEvent $event, Device $device): ?int
     {

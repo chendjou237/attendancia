@@ -3,6 +3,7 @@
 use App\Models\AttendanceSession;
 use App\Models\ClassCode;
 use App\Models\TimetableEntry;
+use App\Models\TimetableVersion;
 use App\Services\Attendance\SessionBuilder;
 use Tests\Support\AttendanceFixture;
 
@@ -64,4 +65,47 @@ it('is idempotent: persisting the same groupings twice reuses the same rows', fu
 
     expect(AttendanceSession::count())->toBe(1);
     expect($sessions2->first()->id)->toBe($sessions1->first()->id);
+});
+
+// The "I made a new timetable and attendance still uses the old one"
+// report: the timetable screen defaults a new version's valid_from to
+// today, so a replacement grid routinely shares a valid_from with the
+// version it replaces. Ordering on valid_from alone left the winner to
+// the database, which returned the older row.
+it('builds from the newest version when two open versions share a valid_from', function () {
+    $f = AttendanceFixture::make([['07:30:00', '08:25:00']]);
+
+    $newClass = ClassCode::factory()->create();
+    $newer = TimetableVersion::factory()->for($f->teacher)->create([
+        'valid_from' => $f->timetableVersion->valid_from->toDateString(),
+        'valid_to' => null,
+    ]);
+    TimetableEntry::factory()->for($newer, 'version')->create([
+        'day_of_week' => 1,
+        'slot_id' => $f->slot->id,
+        'class_code_id' => $newClass->id,
+        'room_id' => $f->room->id,
+    ]);
+
+    expect($f->teacher->timetableVersionFor($f->date)->id)->toBe($newer->id);
+
+    $groupings = (new SessionBuilder)->group($f->teacher, $f->date);
+
+    expect($groupings)->toHaveCount(1);
+    expect($groupings[0]->classCodeId)->toBe($newClass->id);
+});
+
+// Closing a version is how a timetable is cancelled (the "Close
+// timetable" button): the window ends, and the version covering the
+// dates after it governs again — nothing is deleted.
+it('falls back to the previous version once the newer one is closed', function () {
+    $f = AttendanceFixture::make([['07:30:00', '08:25:00']]);
+
+    $newer = TimetableVersion::factory()->for($f->teacher)->create([
+        'valid_from' => $f->timetableVersion->valid_from->toDateString(),
+        'valid_to' => $f->date->clone()->subDay()->toDateString(),
+    ]);
+
+    expect($f->teacher->timetableVersionFor($f->date)->id)->toBe($f->timetableVersion->id);
+    expect($newer->fresh()->exists)->toBeTrue();
 });

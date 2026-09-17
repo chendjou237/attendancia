@@ -137,6 +137,8 @@ return [
         ],
 
         'devices' => [
+            'model' => 'Model',
+            'model_help' => 'Terminal model, e.g. DS-K1T8005EFX. Card readers on card-capable models are not accepted for attendance — teachers must use a fingerprint.',
             'firmware' => 'Firmware',
             'last_seen_at' => 'Last seen at',
             'last_seen_at_help' => 'Written by the ingestion worker — not editable here.',
@@ -195,6 +197,10 @@ return [
             'copy_current' => 'copy current',
             'save_timetable' => 'Save timetable',
             'no_timetable_version' => 'No timetable version exists yet for this teacher. Create one above.',
+            'close_version_valid_to' => 'Close on',
+            'close_version_button' => 'Close timetable',
+            'notification_version_closed' => 'Timetable closed — the previous version applies after this date',
+            'notification_recomputed' => 'Attendance recomputed for :count day(s). Dates more than :days days back are unchanged — run `php artisan attendance:compute <date> --teacher=:staff_no` for those.',
         ],
 
         'users' => [
@@ -244,6 +250,15 @@ return [
 
     ],
 
+    'actions' => [
+        'recompute' => [
+            'label' => 'Recompute attendance',
+            'description' => 'Re-derives this day from the scans already recorded. Manual overrides are never touched.',
+            'all_teachers' => 'All teachers',
+            'notification' => 'Attendance recomputed for :date (:scope)',
+        ],
+    ],
+
     'pages' => [
 
         'exception_queue' => [
@@ -273,6 +288,9 @@ return [
             'failed' => 'Failed',
             'other' => 'Other',
             'no_scans_yet' => 'No scans yet — simulate one above, or wait for the real device.',
+            'no_identified_scans' => 'No scan resolved to a teacher yet — untick the filter to see everything the device sent.',
+            'only_identified' => 'Identified scans only',
+            'rows_shown' => 'Rows',
             'notification_pick_device_teacher' => 'Pick a device and a teacher first',
             'notification_scan_recorded' => 'Scan recorded — :teacher on :device',
             'never_seen' => 'Never seen',
@@ -306,6 +324,10 @@ return [
             'devices_reporting' => 'Devices reporting',
             'devices_silent' => 'One or more silent for 2h+',
             'devices_all_active' => 'All active devices seen recently',
+            'last_computed' => 'Last computed',
+            'last_computed_never' => 'Never',
+            'last_computed_fresh' => 'Attendance is up to date with the scans received',
+            'last_computed_stale' => 'No computation in over :minutes minutes — check the scheduler service',
             'current_report' => "This month's report",
             'current_report_not_generated' => 'Not generated',
             'current_report_description' => 'Click to open Monthly Reports',

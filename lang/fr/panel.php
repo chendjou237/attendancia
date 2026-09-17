@@ -106,6 +106,8 @@ return [
         ],
 
         'devices' => [
+            'model' => 'Modèle',
+            'model_help' => 'Modèle du terminal, par ex. DS-K1T8005EFX. Les lecteurs de badge des modèles compatibles ne sont pas acceptés pour la présence — les enseignants doivent utiliser leur empreinte digitale.',
             'firmware' => 'Micrologiciel',
             'last_seen_at' => 'Dernière activité',
             'last_seen_at_help' => "Écrit par le processus d'ingestion — non modifiable ici.",
@@ -164,6 +166,10 @@ return [
             'copy_current' => 'copier la version actuelle',
             'save_timetable' => "Enregistrer l'emploi du temps",
             'no_timetable_version' => "Aucun emploi du temps n'existe encore pour cet enseignant. Créez-en un ci-dessus.",
+            'close_version_valid_to' => 'Clôturer le',
+            'close_version_button' => "Clôturer l'emploi du temps",
+            'notification_version_closed' => "Emploi du temps clôturé — la version précédente s'applique après cette date",
+            'notification_recomputed' => "Présences recalculées pour :count jour(s). Les dates antérieures à :days jours sont inchangées — utilisez `php artisan attendance:compute <date> --teacher=:staff_no` pour celles-ci.",
         ],
 
         'users' => [
@@ -213,6 +219,15 @@ return [
 
     ],
 
+    'actions' => [
+        'recompute' => [
+            'label' => 'Recalculer les présences',
+            'description' => 'Recalcule la journée à partir des pointages déjà enregistrés. Les corrections manuelles ne sont jamais modifiées.',
+            'all_teachers' => 'Tous les enseignants',
+            'notification' => 'Présences recalculées pour le :date (:scope)',
+        ],
+    ],
+
     'pages' => [
 
         'exception_queue' => [
@@ -242,6 +257,9 @@ return [
             'failed' => 'Échoué',
             'other' => 'Autre',
             'no_scans_yet' => "Aucun pointage pour l'instant — simulez-en un ci-dessus, ou attendez l'appareil réel.",
+            'no_identified_scans' => "Aucun pointage rattaché à un enseignant — décochez le filtre pour voir tout ce que l'appareil a envoyé.",
+            'only_identified' => 'Pointages identifiés seulement',
+            'rows_shown' => 'Lignes',
             'notification_pick_device_teacher' => "Choisissez d'abord un appareil et un enseignant",
             'notification_scan_recorded' => 'Pointage enregistré — :teacher sur :device',
             'never_seen' => 'Jamais vu',
@@ -275,6 +293,10 @@ return [
             'devices_reporting' => 'Appareils actifs',
             'devices_silent' => 'Un ou plusieurs silencieux depuis 2h+',
             'devices_all_active' => 'Tous les appareils actifs vus récemment',
+            'last_computed' => 'Dernier calcul',
+            'last_computed_never' => 'Jamais',
+            'last_computed_fresh' => 'Les présences sont à jour avec les pointages reçus',
+            'last_computed_stale' => "Aucun calcul depuis plus de :minutes minutes — vérifiez le service du planificateur",
             'current_report' => 'Rapport de ce mois',
             'current_report_not_generated' => 'Pas encore généré',
             'current_report_description' => 'Cliquer pour ouvrir les rapports mensuels',

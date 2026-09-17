@@ -8,7 +8,7 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
-#[Fillable(['corridor_id', 'serial', 'ip', 'is_active', 'firmware', 'last_seen_at', 'last_time_offset_seconds'])]
+#[Fillable(['corridor_id', 'serial', 'model', 'ip', 'is_active', 'firmware', 'last_seen_at', 'last_time_offset_seconds'])]
 class Device extends Model
 {
     use HasFactory;

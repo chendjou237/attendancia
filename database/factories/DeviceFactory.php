@@ -18,6 +18,7 @@ class DeviceFactory extends Factory
         return [
             'corridor_id' => Corridor::factory(),
             'serial' => fake()->unique()->numerify('DEV#######'),
+            'model' => fake()->randomElement(['DS-K1A8603', 'DS-K1T8005EFX']),
             'ip' => fake()->localIpv4(),
             'is_active' => true,
             'firmware' => 'V1.2.3',

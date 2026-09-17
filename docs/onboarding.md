@@ -16,6 +16,14 @@ The system never guesses silently. If a scan doesn't clearly resolve to
 `Present` or `Absent`, it lands in the **Exception queue** for a human to
 decide — see §3 below.
 
+**Fingerprints only.** Some terminals (the `DS-K1T8005EFX`) can also read a
+proximity card. Attendancia does not accept card scans for attendance — a card
+can be lent to a colleague or copied, and these figures feed pay. A card swipe
+is recorded but never counts as a taught period, so teachers must scan their
+fingerprint. Ask whoever set up the terminal to switch card authentication off
+on the device itself (see [docs/setup.md](setup.md) §6), so a card is refused
+at the door rather than appearing to work.
+
 ## Logging in
 
 Go to `http://<server-address>/admin` and sign in with the account your

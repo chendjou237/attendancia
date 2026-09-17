@@ -62,7 +62,7 @@ The same five components either way; only the packaging differs.
 | MySQL 8 (or MariaDB 10.6+) | The database | distro package | MySQL Installer for Windows |
 | A web server | Serves the admin panel over HTTP on the school LAN | Nginx + PHP-FPM (or Caddy) | IIS + FastCGI (or Apache) |
 | A process supervisor | Keeps `hikvision:stream` running and restarts it if it dies | Supervisor | NSSM |
-| A scheduler | Fires Laravel's scheduler, which runs the nightly backfill | cron, once a minute | a second NSSM service running `schedule:work` |
+| A scheduler | Fires Laravel's scheduler, which recomputes attendance through the day and runs the nightly backfill | cron, once a minute | a second NSSM service running `schedule:work` |
 
 Official download links for every one of these are in §3.
 
@@ -244,7 +244,6 @@ DB_USERNAME=attendancia
 DB_PASSWORD=<a real password — not blank>
 
 ATTENDANCE_TIMEZONE=Africa/Douala
-ATTENDANCE_ENFORCE_LOCATION=false
 
 HIKVISION_USER=<the ISAPI account you create on the device in §6>
 HIKVISION_PASS=<its password>
@@ -255,12 +254,13 @@ HIKVISION_CLOCK_DRIFT_THRESHOLD=240
 
 Notes on the less obvious ones:
 
-- **`ATTENDANCE_ENFORCE_LOCATION`** — stays `false` for a single-device pilot.
-  With only one corridor wired, most scans will legitimately come from
-  teachers whose real classroom has no terminal yet; that's incomplete
-  coverage, not fraud. The pairing engine still logs what it *would* have
-  flagged, so you can review that log before switching this on once more
-  corridors are wired.
+- **`ATTENDANCE_ENFORCE_LOCATION`** — gone from the environment: teachers
+  check in and out on whichever terminal is nearest, so a scan is never
+  rejected for coming from the "wrong" corridor. `config/attendance.php`
+  now hard-codes `enforce_location => false` precisely so a leftover
+  `true` in a deployed `.env` cannot bring the restriction back. The
+  pairing engine still writes a cross-corridor line to the `attendance`
+  log channel, which is the only thing that flag now affects.
 - **`HIKVISION_BACKFILL_HOURS`** — how far back a backfill run looks by
   default. 48h comfortably covers an overnight outage or a restart. If the
   school has longer outages, raise this — but check it against the device's
@@ -279,6 +279,16 @@ Notes on the less obvious ones:
 ---
 
 ## 6. Configure the Hikvision device
+
+**Supported terminals:** `DS-K1A8603` series and `DS-K1T8005EFX`. Both speak
+identical ISAPI — same digest auth, same `AcsEvent` history endpoint, same
+`alertStream` listener — so nothing in the server configuration differs
+between them.
+
+They differ in what they physically accept. The `DS-K1T8005EFX` has a 125kHz
+EM proximity card reader alongside the fingerprint sensor. **Attendancia does
+not accept card scans** — see step 6 below, which is the important one on a
+card-capable terminal.
 
 Do this from a browser on the same LAN, using the device's own web UI
 (usually `http://<device-ip>`, default Hikvision admin credentials on first
@@ -304,8 +314,31 @@ boot — change them immediately if you haven't already).
    models — check the device's storage/event log settings page. Write this
    number down; it caps how long an outage can last before scans are
    permanently lost (§1).
-6. **Note the device's serial number** — you'll need it for the admin panel
-   (§8) and for the Supervisor command line (§9).
+6. **On a card-capable terminal (`DS-K1T8005EFX`), disable card
+   authentication.** Set the verification mode to fingerprint only, and don't
+   issue proximity cards to teaching staff.
+
+   **Why this matters more than it looks.** A proximity card can be handed to
+   a colleague or cloned; a fingerprint can't, and these records become
+   payable hours — so the server refuses card scans outright. It stores them
+   as evidence and logs them, but they never pair into a session and never
+   count as taught time.
+
+   The problem is what the *teacher* sees. If the terminal still accepts
+   cards, it beeps and flashes green on a card swipe exactly as it does for a
+   fingerprint. A teacher walks away believing they checked in, and is later
+   marked Absent. That's a pay dispute the software cannot prevent, because
+   the misleading feedback comes from the device, not the server. Turning card
+   auth off at the terminal is what makes the refusal visible at the door,
+   where it can still be acted on.
+
+   If a card scan does reach the server, it lands in the `attendance` log
+   channel as `Card scan ignored — attendance requires a fingerprint`, with
+   the employee number — which is how you resolve the dispute after the fact.
+
+7. **Note the device's serial number** — you'll need it for the admin panel
+   (§8) and for the Supervisor command line (§9). Record the model there too,
+   so a mixed fleet is legible from the Device Monitor screen.
 
 **Before trusting any of this against the real pipeline**, run the
 reconnaissance command from the server once the app is installed:
@@ -675,17 +708,55 @@ install script again with a different `$Serial` and `$StreamSvc`.
 
 ---
 
-## 13. The nightly backfill and recompute
+## 13. The scheduled recompute
 
-At `02:00` local time, `routes/console.php` runs `NightlyRecovery`: a
+Attendance does not exist until `attendance:compute` has run. A scan
+landing in `raw_events` recomputes nothing by itself — the stream worker
+stores the row and returns — so **everything on the Exception Queue and
+Teacher Attendance screens is only as current as the last scheduled
+run.** Two entries in `routes/console.php` drive it.
+
+**Every ten minutes, 06:00–20:00 school time** (`attendance-compute-today`):
+`attendance:compute` for the current date. Without this, a scan made
+during the school day would not become a `period_result` until 02:00 the
+next morning, and staff watching teachers tap in front of them would see
+a full day of "no scan-in". If the panel's **Dernier calcul** stat on the
+dashboard goes red, this is what has stopped.
+
+**At `02:00` school time** (`hikvision-nightly-backfill`), `NightlyRecovery`: a
 backfill for every active device, then `attendance:compute` for today and
 yesterday. Backfill alone only recovers `raw_events` — this second half is
 what turns a routine overnight outage into finished `period_results`
 without anyone having to notice the gap and re-run the engine by hand. A
-longer outage (more than a day) needs a human to run `attendance:compute
---date=YYYY-MM-DD` for each earlier affected day once it's noticed, the
-same way it already needs `hikvision:backfill --hours=N` for a window
-longer than the default 48h.
+longer outage (more than a day) leaves dates that nothing revisits: catch
+them up with one range, the same way a window longer than the default 48h
+needs `hikvision:backfill --hours=N`.
+
+```bash
+php artisan attendance:compute --from=2026-09-01 --to=2026-09-17
+php artisan attendance:compute --from=2026-09-01 --to=2026-09-17 --teacher=T042
+```
+
+Recomputing is safe to repeat: every stage upserts on a natural key,
+manual overrides are never touched, and `MonthlyReportGenerator` still
+refuses to alter a report past `OfficerReviewed`.
+
+When a teacher insists they scanned and the panel disagrees,
+`attendance:explain` answers it without a database console. It writes
+nothing:
+
+```bash
+php artisan attendance:explain 2026-09-17 --teacher=T042
+```
+
+It prints each expected session, its pairing window in both school wall
+clock and UTC, every scan resolved to that teacher that day, and the
+stored status — which separates "nobody scanned", "the scan fell outside
+the window", and "no compute has run for this date".
+
+Staff with the **admin** or **officer** role can also re-run one day from
+the panel: the **Recalculer les présences** button in the header of the
+Exception Queue and Teacher Attendance screens. It is audited.
 
 This is driven by Laravel's own scheduler, which has to be running.
 

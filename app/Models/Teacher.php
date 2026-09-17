@@ -56,7 +56,15 @@ class Teacher extends Model
         return $this->timetableVersions()
             ->where('valid_from', '<=', $date->toDateString())
             ->where(fn ($q) => $q->whereNull('valid_to')->orWhere('valid_to', '>=', $date->toDateString()))
+            // id desc is the tiebreak, not decoration: the timetable screen
+            // defaults a new version's valid_from to today, so entering a
+            // replacement grid for a version that already starts today
+            // leaves two open versions on the same date. Ordering on
+            // valid_from alone left which one governs up to the database
+            // (in practice the older row), which is exactly the "I made a
+            // new timetable and attendance still uses the old one" report.
             ->orderByDesc('valid_from')
+            ->orderByDesc('id')
             ->first();
     }
 }

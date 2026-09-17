@@ -43,6 +43,27 @@
                 @endif
             </x-filament::button>
         </div>
+
+        @php($selectedVersion = $versions->firstWhere('id', $versionId))
+
+        {{-- Closing is only offered for a still-open version: one that
+             already has a valid_to is closed, and re-closing it would
+             just be an edit of a date nobody asked to move here. --}}
+        @if ($selectedVersion && ! $selectedVersion->valid_to)
+            <div style="display:flex;align-items:flex-end;gap:0.5rem">
+                <div>
+                    <label style="display:block;font-size:0.875rem;font-weight:500;margin-bottom:0.25rem">
+                        {{ __('panel.resources.teachers.close_version_valid_to') }}
+                    </label>
+                    <x-filament::input.wrapper>
+                        <x-filament::input type="date" wire:model="closeValidTo" />
+                    </x-filament::input.wrapper>
+                </div>
+                <x-filament::button wire:click="closeVersion" color="danger">
+                    {{ __('panel.resources.teachers.close_version_button') }}
+                </x-filament::button>
+            </div>
+        @endif
     </div>
 
     @if ($versionId)
