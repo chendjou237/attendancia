@@ -261,6 +261,13 @@ Notes on the less obvious ones:
   `true` in a deployed `.env` cannot bring the restriction back. The
   pairing engine still writes a cross-corridor line to the `attendance`
   log channel, which is the only thing that flag now affects.
+
+  **If "Lieu incohérent" still appears on new days after deploying**, the
+  server is running a cached config from before the change (an earlier
+  `php artisan config:cache` or `optimize`). Clear it with
+  `php artisan optimize:clear`, restart the two services, then recompute the
+  affected dates: `php artisan attendance:compute --from=YYYY-MM-DD`. Days in
+  the last week are also picked up by the next nightly run.
 - **`HIKVISION_BACKFILL_HOURS`** — how far back a backfill run looks by
   default. 48h comfortably covers an overnight outage or a restart. If the
   school has longer outages, raise this — but check it against the device's
@@ -782,6 +789,11 @@ Confirm it's running and that it can see the schedule:
 Get-Service AttendanciaScheduler
 php artisan schedule:list
 ```
+
+A fingerprint scan also recomputes that teacher's day the moment it's
+stored, so the panel follows the terminal within seconds. The scheduler
+remains the safety net. If it isn't running, days that received no new
+scans are never refreshed, and the dashboard's "Last computed" stat turns red.
 
 ---
 

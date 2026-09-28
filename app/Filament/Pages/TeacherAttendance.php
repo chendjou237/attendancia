@@ -157,6 +157,37 @@ class TeacherAttendance extends Page implements HasTable
                     ->searchable()
                     ->preload(),
 
+                // Filters on the effective status (override_status ??
+                // status), the same value the Status column shows — a
+                // period a human overrode from Unpaired to Present must be
+                // found under Present, not under Unpaired.
+                SelectFilter::make('status')
+                    ->label(__('panel.common.status'))
+                    ->multiple()
+                    ->options(collect(PeriodStatus::cases())
+                        ->mapWithKeys(fn (PeriodStatus $status): array => [$status->value => $status->getLabel()])
+                        ->all())
+                    ->query(fn (Builder $query, array $data): Builder => $query->when(
+                        $data['values'] ?? null,
+                        fn (Builder $query, array $values): Builder => $query->where(fn (Builder $query): Builder => $query
+                            ->whereIn('override_status', $values)
+                            ->orWhere(fn (Builder $query): Builder => $query
+                                ->whereNull('override_status')
+                                ->whereIn('status', $values))),
+                    )),
+
+                SelectFilter::make('reason')
+                    ->label(__('panel.common.why'))
+                    ->multiple()
+                    ->options(collect(SessionAnomaly::cases())
+                        ->mapWithKeys(fn (SessionAnomaly $anomaly): array => [$anomaly->value => $anomaly->getLabel()])
+                        ->all())
+                    ->query(fn (Builder $query, array $data): Builder => $query->when(
+                        $data['values'] ?? null,
+                        fn (Builder $query, array $values): Builder => $query
+                            ->whereHas('session', fn (Builder $query): Builder => $query->whereIn('anomaly_code', $values)),
+                    )),
+
                 Filter::make('date_range')
                     ->label(__('panel.pages.teacher_attendance.date_range'))
                     ->schema([

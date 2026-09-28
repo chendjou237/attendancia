@@ -146,3 +146,49 @@ it('shows a placeholder, not a badge, when there is no anomaly to explain', func
     Livewire::test(TeacherAttendance::class)
         ->assertTableColumnFormattedStateSet('session.anomaly_code', null, $result);
 });
+
+it('narrows by status via the status filter', function () {
+    $teacher = Teacher::factory()->create();
+    $present = periodResultFor($teacher, today()->toDateString(), ['status' => PeriodStatus::Present]);
+    $absent = periodResultFor($teacher, today()->toDateString(), ['status' => PeriodStatus::Absent]);
+    $unpaired = periodResultFor($teacher, today()->toDateString(), ['status' => PeriodStatus::Unpaired]);
+
+    Livewire::test(TeacherAttendance::class)
+        ->filterTable('status', [PeriodStatus::Absent->value, PeriodStatus::Unpaired->value])
+        ->assertCanSeeTableRecords([$absent, $unpaired])
+        ->assertCanNotSeeTableRecords([$present]);
+});
+
+// The filter must agree with the Status column, which shows the effective
+// status: an override is what staff see and act on, so it is what they
+// filter by.
+it('filters on the effective status, so an overridden row matches its override', function () {
+    $teacher = Teacher::factory()->create();
+    $overridden = periodResultFor($teacher, today()->toDateString(), [
+        'status' => PeriodStatus::Unpaired,
+        'override_status' => PeriodStatus::Present,
+    ]);
+
+    Livewire::test(TeacherAttendance::class)
+        ->filterTable('status', [PeriodStatus::Present->value])
+        ->assertCanSeeTableRecords([$overridden]);
+
+    Livewire::test(TeacherAttendance::class)
+        ->filterTable('status', [PeriodStatus::Unpaired->value])
+        ->assertCanNotSeeTableRecords([$overridden]);
+});
+
+it('narrows by pending reason via the reason filter', function () {
+    $teacher = Teacher::factory()->create();
+    $noIn = AttendanceSession::factory()->create(['teacher_id' => $teacher->id, 'anomaly_code' => SessionAnomaly::NoScanIn->value]);
+    $noOut = AttendanceSession::factory()->create(['teacher_id' => $teacher->id, 'anomaly_code' => SessionAnomaly::NoScanOut->value]);
+
+    $missingIn = periodResultFor($teacher, today()->toDateString(), ['status' => PeriodStatus::Unpaired, 'session_id' => $noIn->id]);
+    $missingOut = periodResultFor($teacher, today()->toDateString(), ['status' => PeriodStatus::Unpaired, 'session_id' => $noOut->id]);
+    $present = periodResultFor($teacher, today()->toDateString());
+
+    Livewire::test(TeacherAttendance::class)
+        ->filterTable('reason', [SessionAnomaly::NoScanOut->value])
+        ->assertCanSeeTableRecords([$missingOut])
+        ->assertCanNotSeeTableRecords([$missingIn, $present]);
+});

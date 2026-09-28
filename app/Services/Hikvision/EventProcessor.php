@@ -5,6 +5,7 @@ namespace App\Services\Hikvision;
 use App\Models\Device;
 use App\Models\RawEvent;
 use App\Models\TeacherBiometricId;
+use App\Services\Attendance\AttendanceRefresher;
 use Illuminate\Support\Facades\Log;
 
 /**
@@ -98,6 +99,15 @@ class EventProcessor
             'payload_json' => $event->raw,
             'teacher_id' => $teacherId,
         ]);
+
+        // Only a resolved fingerprint scan can change anyone's attendance,
+        // so only that recomputes — the teacher's day, straight away, on
+        // both the stream and the backfill path. Resolved from the
+        // container rather than injected so the many `new EventProcessor`
+        // call sites keep working.
+        if ($teacherId !== null) {
+            app(AttendanceRefresher::class)->refreshForScan($raw);
+        }
 
         if ($event->subEventType === self::SUB_EVENT_FAILED) {
             Log::channel('attendance')->info('Fingerprint failed / unenrolled', [

@@ -81,12 +81,15 @@ Ingestion has two paths — the live `hikvision:stream` worker and the
 filtering or normalisation logic to either path; it belongs in `EventProcessor`
 or `EventNormalizer` so the two cannot drift apart.
 
-Nothing in that pipeline is triggered by a scan arriving. `EventProcessor`
-stores the `raw_events` row and returns — there are no jobs, events or
-observers — so `period_results` only exist where `attendance:compute` has
-run. Two scheduled entries in `routes/console.php` drive it: the current
+A resolved fingerprint scan recomputes its teacher's day as it is stored:
+`EventProcessor` hands it to `AttendanceRefresher`, which runs `DayResolver`
+for that (teacher, school-local date) and swallows its own failures so a
+compute error can never lose a scan. That is best-effort, not the source of
+truth — `period_results` only exist where a compute has run, and anything
+else that changes an input still needs one. Scans are the fast path; the
+safety net is two scheduled entries in `routes/console.php`: the current
 date every ten minutes through the school day, and `NightlyRecovery` at
-02:00 (backfill, then today and yesterday). Anything older than that
+02:00 (backfill, then the trailing seven days). Anything older than that
 window is never revisited automatically; `attendance:compute --from= --to=`
 is the catch-up, and `attendance:explain <date> --teacher=` says why one
 teacher's day paired the way it did without writing anything. If you add

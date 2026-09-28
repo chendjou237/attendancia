@@ -14,6 +14,7 @@ use App\Models\TimetableEntry;
 use App\Models\TimetableVersion;
 use App\Services\Hikvision\AcsEventFetcher;
 use App\Services\Hikvision\NightlyRecovery;
+use Illuminate\Support\Facades\Artisan;
 
 beforeEach(function () {
     config(['attendance.default_user' => 'admin', 'attendance.default_pass' => 'secret']);
@@ -116,3 +117,21 @@ it('is safe to run with no active devices and nothing to compute', function () {
 
     (new NightlyRecovery)->run(); // should not throw
 })->throwsNoExceptions();
+
+// A week, not two days: an outage over a weekend, or a date left stale by
+// a config change, is still inside the window the next night.
+it('recomputes a date six days back, but not one seven days back', function () {
+    fakeEmptyAcsEventFetcher();
+
+    $computed = [];
+    Artisan::command('attendance:compute {date?}', function () use (&$computed) {
+        $computed[] = $this->argument('date');
+    });
+
+    (new NightlyRecovery)->run();
+
+    $today = Carbon\Carbon::now(config('attendance.timezone'));
+    expect($computed)->toHaveCount(NightlyRecovery::TRAILING_DAYS);
+    expect($computed)->toContain($today->toDateString(), $today->clone()->subDays(6)->toDateString());
+    expect($computed)->not->toContain($today->clone()->subDays(7)->toDateString());
+});

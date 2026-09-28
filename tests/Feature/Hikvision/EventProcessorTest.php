@@ -1,10 +1,19 @@
 <?php
 
+use App\Enums\PeriodStatus;
+use App\Models\ClassCode;
 use App\Models\Corridor;
 use App\Models\Device;
+use App\Models\PeriodResult;
+use App\Models\PeriodSlot;
 use App\Models\RawEvent;
+use App\Models\Room;
+use App\Models\RuleVersion;
 use App\Models\Teacher;
 use App\Models\TeacherBiometricId;
+use App\Models\TimetableEntry;
+use App\Models\TimetableVersion;
+use App\Services\Attendance\DayResolver;
 use App\Services\Hikvision\EventNormalizer;
 use App\Services\Hikvision\EventProcessor;
 use Carbon\Carbon;
@@ -179,4 +188,106 @@ it('logs a card scan as an ignored card, not as an unrecognised sub-type', funct
     (new EventProcessor)->handle($event, $d, 'stream');
 
     $spy->shouldHaveReceived('info');
+});
+
+/**
+ * One timetabled period on 2026-08-18 (the date streamPayload() scans
+ * on), 08:30–09:15 school time, in a room on a DIFFERENT corridor from
+ * the terminal — so a Present here also proves the scan's corridor is
+ * ignored. The teacher already scanned in at 08:28; streamPayload()'s
+ * 09:14 scan is the scan-out.
+ *
+ * @return array{0: Device, 1: Teacher, 2: PeriodSlot, 3: RuleVersion}
+ */
+function scheduledTeacherWithScanIn(): array
+{
+    $tz = config('attendance.timezone');
+    $date = Carbon::parse('2026-08-18', $tz);
+
+    $d = device();
+    $teacher = Teacher::factory()->create();
+    TeacherBiometricId::factory()->for($teacher)->create(['biometric_id' => '7', 'valid_from' => '2020-01-01']);
+
+    $otherCorridorRoom = Room::factory()->for(Corridor::factory())->create();
+    $version = TimetableVersion::factory()->for($teacher)->create(['valid_from' => '2025-01-01']);
+    $slot = PeriodSlot::factory()->create([
+        'day_of_week' => $date->dayOfWeek,
+        'seq' => 1,
+        'start_time' => '08:30:00',
+        'end_time' => '09:15:00',
+        'is_break' => false,
+        'valid_from' => '2025-01-01',
+    ]);
+    TimetableEntry::factory()->for($version, 'version')->create([
+        'day_of_week' => $date->dayOfWeek,
+        'slot_id' => $slot->id,
+        'class_code_id' => ClassCode::factory(),
+        'room_id' => $otherCorridorRoom->id,
+    ]);
+    $rule = RuleVersion::factory()->create(['valid_from' => '2025-01-01']);
+
+    $scanIn = Carbon::parse('2026-08-18 08:28:00', $tz)->utc();
+    RawEvent::factory()->create([
+        'device_id' => $d->id,
+        'teacher_id' => $teacher->id,
+        'event_time_device' => $scanIn,
+        'event_time_server' => $scanIn,
+    ]);
+
+    return [$d, $teacher, $slot, $rule];
+}
+
+// The panel used to lag the terminal until the next scheduled
+// attendance:compute pass. A resolved fingerprint scan now recomputes
+// that teacher's day as it is stored.
+it('recomputes the teacher\'s day as soon as a fingerprint scan is stored, whatever corridor it came from', function () {
+    [$d, $teacher, $slot] = scheduledTeacherWithScanIn();
+
+    (new EventProcessor)->handle((new EventNormalizer)->fromStreamPayload(streamPayload()), $d, 'stream');
+
+    $result = PeriodResult::query()->current()
+        ->where('teacher_id', $teacher->id)->where('date', '2026-08-18')->where('slot_id', $slot->id)->first();
+
+    expect($result)->not->toBeNull();
+    expect($result->status)->toBe(PeriodStatus::Present);
+});
+
+// A day computed while corridor enforcement was still on keeps its
+// LOCATION_MISMATCH until something recomputes it. The next scan does.
+it('replaces a stale location mismatch with the real result on the next scan', function () {
+    [$d, $teacher, $slot, $rule] = scheduledTeacherWithScanIn();
+    $stale = PeriodResult::factory()->create([
+        'teacher_id' => $teacher->id,
+        'date' => '2026-08-18',
+        'slot_id' => $slot->id,
+        'rule_version_id' => $rule->id,
+        'status' => PeriodStatus::LocationMismatch,
+        'is_current' => true,
+    ]);
+
+    (new EventProcessor)->handle((new EventNormalizer)->fromStreamPayload(streamPayload()), $d, 'stream');
+
+    expect($stale->refresh()->status)->toBe(PeriodStatus::Present);
+});
+
+it('does not compute attendance from a card scan', function () {
+    [$d, $teacher] = scheduledTeacherWithScanIn();
+
+    (new EventProcessor)->handle((new EventNormalizer)->fromStreamPayload(streamPayload(['subEventType' => 1])), $d, 'stream');
+
+    expect(PeriodResult::where('teacher_id', $teacher->id)->exists())->toBeFalse();
+});
+
+// The scan is already stored when the recompute runs; a compute error
+// must not turn into a lost event or a crashed stream worker.
+it('still stores the scan when the recompute after it fails', function () {
+    [$d] = scheduledTeacherWithScanIn();
+
+    $resolver = Mockery::mock(DayResolver::class);
+    $resolver->shouldReceive('resolve')->andThrow(new RuntimeException('boom'));
+    app()->instance(DayResolver::class, $resolver);
+
+    (new EventProcessor)->handle((new EventNormalizer)->fromStreamPayload(streamPayload()), $d, 'stream');
+
+    expect(RawEvent::where('device_event_serial', 1042)->exists())->toBeTrue();
 });
