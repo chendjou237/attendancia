@@ -2,11 +2,11 @@
 
 namespace App\Filament\Resources\Teachers\Tables;
 
+use App\Filament\Actions\GuardedDelete;
 use App\Filament\Resources\Teachers\TeacherResource;
 use App\Models\Teacher;
 use Filament\Actions\Action;
 use Filament\Actions\BulkActionGroup;
-use Filament\Actions\DeleteBulkAction;
 use Filament\Actions\EditAction;
 use Filament\Support\Icons\Heroicon;
 use Filament\Tables\Columns\TextColumn;
@@ -59,7 +59,7 @@ class TeachersTable
             ])
             ->toolbarActions([
                 BulkActionGroup::make([
-                    DeleteBulkAction::make(),
+                    GuardedDelete::bulk(),
                 ]),
             ]);
     }

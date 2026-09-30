@@ -2,8 +2,8 @@
 
 namespace App\Filament\Resources\Users\Tables;
 
+use App\Filament\Actions\GuardedDelete;
 use Filament\Actions\BulkActionGroup;
-use Filament\Actions\DeleteBulkAction;
 use Filament\Actions\EditAction;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Table;
@@ -43,7 +43,7 @@ class UsersTable
             ])
             ->toolbarActions([
                 BulkActionGroup::make([
-                    DeleteBulkAction::make(),
+                    GuardedDelete::bulk(),
                 ]),
             ]);
     }

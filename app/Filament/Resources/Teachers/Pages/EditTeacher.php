@@ -2,8 +2,8 @@
 
 namespace App\Filament\Resources\Teachers\Pages;
 
+use App\Filament\Actions\GuardedDelete;
 use App\Filament\Resources\Teachers\TeacherResource;
-use Filament\Actions\DeleteAction;
 use Filament\Resources\Pages\EditRecord;
 
 class EditTeacher extends EditRecord
@@ -13,7 +13,7 @@ class EditTeacher extends EditRecord
     protected function getHeaderActions(): array
     {
         return [
-            DeleteAction::make(),
+            GuardedDelete::make(),
         ];
     }
 }

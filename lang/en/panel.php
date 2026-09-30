@@ -184,6 +184,7 @@ return [
         ],
 
         'teachers' => [
+            'cannot_delete_has_attendance' => ':name already has recorded attendance and cannot be deleted — it is a payroll input.',
             'timetable_title' => 'Timetable — :name',
             'notification_version_created' => 'New timetable version created',
             'notification_timetable_saved' => 'Timetable saved',
@@ -204,6 +205,8 @@ return [
         ],
 
         'users' => [
+            'cannot_delete_self' => 'You cannot delete your own account.',
+            'cannot_delete_last_admin' => 'This is the last admin account — create another admin before deleting it.',
             'email' => 'Email',
             'password' => 'Password',
             'password_help' => 'Leave blank to keep the current password.',
@@ -251,6 +254,7 @@ return [
     ],
 
     'actions' => [
+        'delete_refused' => 'Delete refused',
         'recompute' => [
             'label' => 'Recompute attendance',
             'description' => 'Re-derives this day from the scans already recorded. Manual overrides are never touched.',

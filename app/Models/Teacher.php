@@ -4,6 +4,7 @@ namespace App\Models;
 
 use App\Casts\DateOnly;
 use App\Enums\EmploymentType;
+use App\Models\Contracts\GuardsDeletion;
 use Carbon\CarbonInterface;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -11,7 +12,7 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
 #[Fillable(['staff_no', 'full_name', 'employment_type', 'active_from', 'active_to'])]
-class Teacher extends Model
+class Teacher extends Model implements GuardsDeletion
 {
     use HasFactory;
 
@@ -42,6 +43,21 @@ class Teacher extends Model
     public function periodResults(): HasMany
     {
         return $this->hasMany(PeriodResult::class);
+    }
+
+    /**
+     * sessions and period_results reference teachers with RESTRICT: once
+     * attendance has been computed for a teacher, it is a payroll input and
+     * the row stays. Checked up front so the panel can say so instead of
+     * failing on the foreign key.
+     */
+    public function deletionBlockedReason(): ?string
+    {
+        if ($this->sessions()->exists() || $this->periodResults()->exists()) {
+            return __('panel.resources.teachers.cannot_delete_has_attendance', ['name' => $this->full_name]);
+        }
+
+        return null;
     }
 
     /**

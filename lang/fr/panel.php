@@ -153,6 +153,7 @@ return [
         ],
 
         'teachers' => [
+            'cannot_delete_has_attendance' => ":name a déjà des présences enregistrées et ne peut pas être supprimé(e) — ces données alimentent la paie.",
             'timetable_title' => 'Emploi du temps — :name',
             'notification_version_created' => "Nouvelle version d'emploi du temps créée",
             'notification_timetable_saved' => 'Emploi du temps enregistré',
@@ -173,6 +174,8 @@ return [
         ],
 
         'users' => [
+            'cannot_delete_self' => 'Vous ne pouvez pas supprimer votre propre compte.',
+            'cannot_delete_last_admin' => "C'est le dernier compte administrateur — créez-en un autre avant de supprimer celui-ci.",
             'email' => 'E-mail',
             'password' => 'Mot de passe',
             'password_help' => 'Laisser vide pour conserver le mot de passe actuel.',
@@ -220,6 +223,7 @@ return [
     ],
 
     'actions' => [
+        'delete_refused' => 'Suppression refusée',
         'recompute' => [
             'label' => 'Recalculer les présences',
             'description' => 'Recalcule la journée à partir des pointages déjà enregistrés. Les corrections manuelles ne sont jamais modifiées.',
