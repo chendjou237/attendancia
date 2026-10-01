@@ -120,6 +120,23 @@ it('marks location_mismatch when the only scan is at the wrong corridor and enfo
     expect($session->anomaly_code)->toBe(SessionAnomaly::LocationMismatch->value);
 });
 
+// A tap a few minutes after the lesson ended (AHANDA, 2026-10-01: 09:23
+// for a lesson ending 09:20) sits in the scan-out allowance, never the
+// scan-in range. It used to be reported as location_mismatch — "scanned
+// in the wrong corridor" — with enforcement off.
+it('reports no_scan_in, not location_mismatch, when the only scan is after the session ended', function (bool $enforce) {
+    config(['attendance.enforce_location' => $enforce]);
+    $f = AttendanceFixture::make(); // 07:30–08:25, scan-out allowance to 08:40
+    $session = pairedSession($f);
+    $f->scanAt('08:28:00');
+
+    (new PairingEngine)->pair($session, $f->rule);
+    $session->refresh();
+
+    expect($session->state)->toBe(SessionState::Unpaired)
+        ->and($session->anomaly_code)->toBe(SessionAnomaly::NoScanIn->value);
+})->with(['enforcement off' => false, 'enforcement on' => true]);
+
 // Decision: one raw_event may serve as both the scan-out of session A
 // and the scan-in of session B — no "consumption".
 it('lets one boundary scan serve as scan-out of one session and scan-in of the next', function () {

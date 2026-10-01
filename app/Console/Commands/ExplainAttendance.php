@@ -110,7 +110,7 @@ class ExplainAttendance extends Command
         $dayEnd = $dayStart->clone()->addDay();
 
         $events = RawEvent::query()
-            ->where('teacher_id', $teacher->id)
+            ->whereIn('teacher_id', $teacher->scanSourceIds())
             ->where(function ($q) use ($dayStart, $dayEnd) {
                 $q->whereBetween('event_time_device', [$dayStart, $dayEnd])
                     ->orWhere(fn ($q2) => $q2->whereNull('event_time_device')
@@ -159,7 +159,7 @@ class ExplainAttendance extends Command
         $this->line('  scan-out accepted  from the scan-in .. '.$this->both($windowEnd, $tz));
 
         $candidates = RawEvent::query()
-            ->where('teacher_id', $teacher->id)
+            ->whereIn('teacher_id', $teacher->scanSourceIds())
             ->where(function ($q) use ($windowStart, $windowEnd) {
                 $q->whereBetween('event_time_device', [$windowStart, $windowEnd])
                     ->orWhere(fn ($q2) => $q2->whereNull('event_time_device')

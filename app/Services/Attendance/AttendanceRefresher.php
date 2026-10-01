@@ -45,6 +45,10 @@ class AttendanceRefresher
                 return;
             }
 
+            // A scan still resolving to a merged duplicate (a backfill from
+            // before its fingerprint moved) is the real teacher's scan.
+            $teacher = $teacher->mergedInto ?? $teacher;
+
             $this->resolver->resolve($teacher, $date, $rule);
         } catch (\Throwable $e) {
             Log::channel('attendance')->warning('AttendanceRefresher: recompute after scan failed; the scheduled pass will retry', [

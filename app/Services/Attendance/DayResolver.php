@@ -55,7 +55,12 @@ class DayResolver
         $calendarDay = CalendarDay::query()->where('date', $date->toDateString())->first();
         $dayType = $calendarDay?->day_type ?? DayType::Teaching;
 
-        if ($dayType->hasNoExpectedSessions()) {
+        // A teacher outside their active range (left the school, or a
+        // deactivated duplicate) is expected nowhere — same outcome as a
+        // closure. attendance:compute's default run already skips them, but
+        // --teacher and AttendanceRefresher don't, and a deactivation needs
+        // this to retire results already written after active_to.
+        if ($dayType->hasNoExpectedSessions() || ! $teacher->isActiveOn($date)) {
             $this->clearCurrentResults($teacher, $date);
 
             return;

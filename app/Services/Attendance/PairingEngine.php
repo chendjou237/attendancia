@@ -42,10 +42,10 @@ use Illuminate\Support\Facades\Log;
  *     corridor pairs exactly like one from the session's own corridor.
  *     config('attendance.enforce_location') is now a hard false (see the
  *     config file for why it is a constant rather than an env lookup),
- *     which leaves the filter below and the LocationMismatch branch
- *     unreachable in practice; both are kept so period_results written
- *     under the old rule still read back, and the cross-corridor log
- *     line still records where a teacher actually tapped.
+ *     which leaves the filter below and the LocationMismatch anomaly
+ *     unreachable; both are kept so period_results written under the old
+ *     rule still read back, and the cross-corridor log line still records
+ *     where a teacher actually tapped.
  */
 class PairingEngine
 {
@@ -63,7 +63,7 @@ class PairingEngine
 
         $allEvents = $this->debounce(
             RawEvent::query()
-                ->where('teacher_id', $session->teacher_id)
+                ->whereIn('teacher_id', $session->teacher->scanSourceIds())
                 ->where(function ($q) use ($windowStart, $windowEnd) {
                     $q->whereBetween('event_time_device', [$windowStart, $windowEnd])
                         ->orWhere(fn ($q2) => $q2->whereNull('event_time_device')
@@ -88,10 +88,17 @@ class PairingEngine
             $session->scan_in_event_id = null;
             $session->scan_out_event_id = null;
             $session->state = SessionState::Unpaired;
-            // Only reachable when enforcing (otherwise $candidates already
-            // is $allEvents, so finding nothing here means there was
-            // nothing to find anywhere).
-            $session->anomaly_code = $allEvents->isNotEmpty()
+            // LocationMismatch only when the corridor filter is what
+            // removed a scan-in. Testing $allEvents->isNotEmpty() instead
+            // was wrong: $allEvents also holds scans *after* the session
+            // ended (the scan-out allowance), which can never be a scan-in,
+            // so a teacher who tapped at 09:23 for a lesson ending 09:20 was
+            // reported as "scanned in the wrong corridor" with enforcement
+            // off.
+            $filteredOutScanIn = $enforceLocation && $allEvents->contains(
+                fn (RawEvent $e) => $e->effectiveTime()->betweenIncluded($windowStart, $sessionEnd)
+            );
+            $session->anomaly_code = $filteredOutScanIn
                 ? SessionAnomaly::LocationMismatch->value
                 : SessionAnomaly::NoScanIn->value;
             $session->save();

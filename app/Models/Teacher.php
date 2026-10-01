@@ -9,6 +9,7 @@ use Carbon\CarbonInterface;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
 #[Fillable(['staff_no', 'full_name', 'employment_type', 'active_from', 'active_to'])]
@@ -23,6 +24,42 @@ class Teacher extends Model implements GuardsDeletion
             'active_from' => DateOnly::class,
             'active_to' => DateOnly::class,
         ];
+    }
+
+    /**
+     * The real record this one duplicated. Deliberately not fillable: only
+     * App\Services\Attendance\TeacherDeactivator sets it, because setting
+     * it without recomputing both teachers leaves stale period_results.
+     */
+    public function mergedInto(): BelongsTo
+    {
+        return $this->belongsTo(self::class, 'merged_into_id');
+    }
+
+    public function duplicates(): HasMany
+    {
+        return $this->hasMany(self::class, 'merged_into_id');
+    }
+
+    public function isActiveOn(CarbonInterface $date): bool
+    {
+        $day = $date->toDateString();
+
+        return $this->active_from->toDateString() <= $day
+            && ($this->active_to === null || $this->active_to->toDateString() >= $day);
+    }
+
+    /**
+     * Teacher ids whose scans count as this teacher's: its own, plus any
+     * duplicate merged into it. raw_events is append-only, so a duplicate's
+     * scans keep the duplicate's teacher_id forever — pairing widens the
+     * lookup instead of rewriting them.
+     *
+     * @return list<int>
+     */
+    public function scanSourceIds(): array
+    {
+        return [$this->id, ...$this->duplicates()->pluck('id')->all()];
     }
 
     public function biometricIds(): HasMany
