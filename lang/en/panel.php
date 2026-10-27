@@ -286,6 +286,7 @@ return [
     'pages' => [
 
         'exception_queue' => [
+            'view_scans' => 'View scans',
             'override_action' => 'Override',
             'actual_status' => 'Actual status',
             'reason_help' => 'Mandatory — this becomes part of the audit trail (§9, §14).',
@@ -294,6 +295,12 @@ return [
         ],
 
         'device_monitor' => [
+            'all_teachers' => 'All teachers',
+            'all_devices' => 'All devices',
+            'search' => 'Search',
+            'search_placeholder' => 'Name or fingerprint ID…',
+            'reset_filters' => 'Reset',
+            'no_scans_for_filters' => 'No scans match these filters.',
             'online' => 'Online',
             'silent' => 'Silent',
             'offline' => 'Offline',

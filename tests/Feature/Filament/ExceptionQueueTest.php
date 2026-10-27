@@ -4,6 +4,7 @@ use App\Enums\PeriodSource;
 use App\Enums\PeriodStatus;
 use App\Enums\SessionAnomaly;
 use App\Enums\SessionState;
+use App\Filament\Pages\DeviceMonitor;
 use App\Filament\Pages\ExceptionQueue;
 use App\Models\AttendanceSession;
 use App\Models\AuditLog;
@@ -117,4 +118,65 @@ it('a resolved override no longer appears in the queue', function () {
         );
 
     $component->assertCanNotSeeTableRecords([$record->fresh()]);
+});
+
+// --- Filters, and the link to the scans behind a case ---
+
+it('shows pending periods of any age by default (no date preset)', function () {
+    $old = unpairedPeriodResult();
+    $old->update(['date' => now()->subMonths(2)->toDateString()]);
+
+    Livewire::test(ExceptionQueue::class)->assertCanSeeTableRecords([$old]);
+});
+
+it('filters by teacher and by date range', function () {
+    $a = unpairedPeriodResult();
+    $a->update(['date' => '2026-09-29']);
+    $b = unpairedPeriodResult();
+    $b->update(['date' => '2026-09-30']);
+
+    Livewire::test(ExceptionQueue::class)
+        ->filterTable('teacher', $a->teacher_id)
+        ->assertCanSeeTableRecords([$a])
+        ->assertCanNotSeeTableRecords([$b]);
+
+    Livewire::test(ExceptionQueue::class)
+        ->filterTable('date_range', ['from' => '2026-09-30', 'to' => '2026-09-30'])
+        ->assertCanSeeTableRecords([$b])
+        ->assertCanNotSeeTableRecords([$a]);
+});
+
+it('filters by reason and by class', function () {
+    $noScanIn = unpairedPeriodResult();
+    $noScanOut = unpairedPeriodResult();
+    $noScanOut->session->update(['anomaly_code' => SessionAnomaly::NoScanOut->value]);
+
+    Livewire::test(ExceptionQueue::class)
+        ->filterTable('reason', [SessionAnomaly::NoScanOut->value])
+        ->assertCanSeeTableRecords([$noScanOut])
+        ->assertCanNotSeeTableRecords([$noScanIn]);
+
+    Livewire::test(ExceptionQueue::class)
+        ->filterTable('class_code', $noScanIn->class_code_id)
+        ->assertCanSeeTableRecords([$noScanIn])
+        ->assertCanNotSeeTableRecords([$noScanOut]);
+});
+
+it('links a case to that teacher\'s scans for that day', function () {
+    $result = unpairedPeriodResult();
+
+    Livewire::test(ExceptionQueue::class)
+        ->assertTableActionHasUrl('viewScans', DeviceMonitor::getUrl([
+            'teacher' => $result->teacher_id,
+            'date' => $result->date->toDateString(),
+        ]), $result);
+});
+
+it('hides the scans link from roles that cannot open the device monitor', function () {
+    $principal = User::factory()->create();
+    $principal->assignRole('principal');
+    $this->actingAs($principal);
+    $result = unpairedPeriodResult();
+
+    Livewire::test(ExceptionQueue::class)->assertTableActionHidden('viewScans', $result);
 });

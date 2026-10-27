@@ -169,8 +169,58 @@
                         </x-filament::input.wrapper>
                     </label>
 
-                    <div style="font-size:0.75rem;color:rgb(113 113 122)">{{ __('panel.pages.device_monitor.updates_every_3s') }}</div>
+                    @if ($this->isViewingToday())
+                        <div style="font-size:0.75rem;color:rgb(113 113 122)">{{ __('panel.pages.device_monitor.updates_every_3s') }}</div>
+                    @endif
                 </div>
+            </div>
+
+            {{-- Case-by-case lookup: one teacher, one day. The Exception
+                 Queue's "view scans" link pre-fills teacher and date. --}}
+            <div style="display:flex;align-items:flex-end;gap:0.75rem;flex-wrap:wrap;margin-bottom:0.75rem">
+                <label style="display:flex;flex-direction:column;gap:0.25rem;font-size:0.75rem;color:rgb(113 113 122)">
+                    {{ __('panel.common.date') }}
+                    <x-filament::input.wrapper>
+                        <x-filament::input type="date" wire:model.live="feedDate" />
+                    </x-filament::input.wrapper>
+                </label>
+
+                <label style="display:flex;flex-direction:column;gap:0.25rem;font-size:0.75rem;color:rgb(113 113 122);min-width:14rem">
+                    {{ __('panel.common.teacher') }}
+                    <x-filament::input.wrapper>
+                        <x-filament::input.select wire:model.live="feedTeacherId">
+                            <option value="">{{ __('panel.pages.device_monitor.all_teachers') }}</option>
+                            @foreach ($this->feedTeachers as $teacher)
+                                <option value="{{ $teacher->id }}">{{ $teacher->full_name }} — {{ $teacher->staff_no }}</option>
+                            @endforeach
+                        </x-filament::input.select>
+                    </x-filament::input.wrapper>
+                </label>
+
+                <label style="display:flex;flex-direction:column;gap:0.25rem;font-size:0.75rem;color:rgb(113 113 122)">
+                    {{ __('panel.common.device') }}
+                    <x-filament::input.wrapper>
+                        <x-filament::input.select wire:model.live="feedDeviceId">
+                            <option value="">{{ __('panel.pages.device_monitor.all_devices') }}</option>
+                            @foreach ($this->devices as $device)
+                                <option value="{{ $device['id'] }}">{{ $device['corridor'] }} — {{ $device['serial'] }}</option>
+                            @endforeach
+                        </x-filament::input.select>
+                    </x-filament::input.wrapper>
+                </label>
+
+                <label style="display:flex;flex-direction:column;gap:0.25rem;font-size:0.75rem;color:rgb(113 113 122);flex:1;min-width:12rem">
+                    {{ __('panel.pages.device_monitor.search') }}
+                    <x-filament::input.wrapper prefix-icon="heroicon-o-magnifying-glass">
+                        <x-filament::input type="search" wire:model.live.debounce.400ms="feedSearch" placeholder="{{ __('panel.pages.device_monitor.search_placeholder') }}" />
+                    </x-filament::input.wrapper>
+                </label>
+
+                @if ($this->hasFeedFilters())
+                    <x-filament::button color="gray" size="sm" wire:click="resetFeedFilters" icon="heroicon-o-x-mark">
+                        {{ __('panel.pages.device_monitor.reset_filters') }}
+                    </x-filament::button>
+                @endif
             </div>
 
             {{-- Capped height with its own scroll: 500 rows must not push
@@ -224,9 +274,11 @@
                         @empty
                             <tr>
                                 <td colspan="4" style="padding:1rem;text-align:center;color:rgb(156 163 175)">
-                                    {{ $onlyIdentified
-                                        ? __('panel.pages.device_monitor.no_identified_scans')
-                                        : __('panel.pages.device_monitor.no_scans_yet') }}
+                                    {{ match (true) {
+                                        $this->hasFeedFilters() => __('panel.pages.device_monitor.no_scans_for_filters'),
+                                        $onlyIdentified => __('panel.pages.device_monitor.no_identified_scans'),
+                                        default => __('panel.pages.device_monitor.no_scans_yet'),
+                                    } }}
                                 </td>
                             </tr>
                         @endforelse

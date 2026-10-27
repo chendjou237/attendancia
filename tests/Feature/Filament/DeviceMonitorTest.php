@@ -9,6 +9,7 @@ use App\Models\Teacher;
 use App\Models\TeacherBiometricId;
 use App\Models\User;
 use Database\Seeders\RoleSeeder;
+use Illuminate\Support\Carbon;
 use Livewire\Livewire;
 
 beforeEach(function () {
@@ -212,4 +213,121 @@ it('can hide everything no fingerprint resolved to a teacher', function () {
 
     $component->set('onlyIdentified', true);
     expect($component->get('recentEvents')->pluck('id')->all())->toBe([$identified->id]);
+});
+
+// --- Case-by-case lookup: date, teacher, device and search filters ---
+
+function scanFor(array $attributes, string $localTime): RawEvent
+{
+    $at = Carbon::parse($localTime, config('attendance.timezone'))->utc();
+
+    return RawEvent::factory()->create(array_merge([
+        'event_time_device' => $at,
+        'event_time_server' => $at,
+    ], $attributes));
+}
+
+it('filters the feed by the school-local day, not the UTC one', function () {
+    loginAsForMonitor('admin');
+    // 23:30 local on the 29th is still the 29th; 00:30 on the 30th is the
+    // 30th — though in UTC both sit on the 29th.
+    $lateEvening = scanFor([], '2026-09-29 23:30:00');
+    scanFor([], '2026-09-30 00:30:00');
+
+    $events = Livewire::test(DeviceMonitor::class)->set('feedDate', '2026-09-29')->get('recentEvents');
+
+    expect($events->pluck('id')->all())->toBe([$lateEvening->id]);
+});
+
+it('reads a past day earliest scan first', function () {
+    loginAsForMonitor('admin');
+    $late = scanFor([], '2026-09-29 15:00:00');
+    $early = scanFor([], '2026-09-29 07:29:00');
+
+    $events = Livewire::test(DeviceMonitor::class)->set('feedDate', '2026-09-29')->get('recentEvents');
+
+    expect($events->pluck('id')->all())->toBe([$early->id, $late->id]);
+});
+
+it('filters by teacher, including scans of a duplicate merged into them', function () {
+    loginAsForMonitor('admin');
+    $teacher = Teacher::factory()->create();
+    $duplicate = Teacher::factory()->create();
+    $duplicate->forceFill(['merged_into_id' => $teacher->id])->save();
+    $own = scanFor(['teacher_id' => $teacher->id], '2026-09-29 07:29:00');
+    $merged = scanFor(['teacher_id' => $duplicate->id], '2026-09-29 09:23:00');
+    scanFor(['teacher_id' => Teacher::factory()->create()->id], '2026-09-29 08:00:00');
+
+    $monitor = Livewire::test(DeviceMonitor::class)
+        ->set('feedDate', '2026-09-29')
+        ->set('feedTeacherId', (string) $teacher->id);
+
+    expect($monitor->get('recentEvents')->pluck('id')->all())->toBe([$own->id, $merged->id])
+        ->and($monitor->get('feedTeachers')->pluck('id'))->not->toContain($duplicate->id);
+});
+
+it('searches by teacher name and by raw fingerprint id', function () {
+    loginAsForMonitor('admin');
+    $ahanda = Teacher::factory()->create(['full_name' => 'AHANDA']);
+    $byName = scanFor(['teacher_id' => $ahanda->id], '2026-09-29 07:29:00');
+    $unmatched = scanFor(['teacher_id' => null, 'biometric_id' => '90417'], '2026-09-29 08:00:00');
+
+    $monitor = Livewire::test(DeviceMonitor::class)->set('feedDate', '2026-09-29');
+
+    expect($monitor->set('feedSearch', 'ahan')->get('recentEvents')->pluck('id')->all())->toBe([$byName->id])
+        ->and($monitor->set('feedSearch', '9041')->get('recentEvents')->pluck('id')->all())->toBe([$unmatched->id]);
+});
+
+it('filters by device', function () {
+    loginAsForMonitor('admin');
+    $a = Device::factory()->for(Corridor::factory())->create();
+    $b = Device::factory()->for(Corridor::factory())->create();
+    $onA = scanFor(['device_id' => $a->id, 'device_serial' => $a->serial], '2026-09-29 07:29:00');
+    scanFor(['device_id' => $b->id, 'device_serial' => $b->serial], '2026-09-29 07:30:00');
+
+    $events = Livewire::test(DeviceMonitor::class)
+        ->set('feedDate', '2026-09-29')
+        ->set('feedDeviceId', (string) $a->id)
+        ->get('recentEvents');
+
+    expect($events->pluck('id')->all())->toBe([$onA->id]);
+});
+
+it('pre-fills teacher and date from the URL (the Exception Queue link)', function () {
+    loginAsForMonitor('admin');
+    $teacher = Teacher::factory()->create();
+    $scan = scanFor(['teacher_id' => $teacher->id], '2026-09-29 07:29:00');
+
+    $events = Livewire::withQueryParams(['teacher' => (string) $teacher->id, 'date' => '2026-09-29'])
+        ->test(DeviceMonitor::class)
+        ->assertSet('feedDate', '2026-09-29')
+        ->get('recentEvents');
+
+    expect($events->pluck('id')->all())->toBe([$scan->id]);
+});
+
+it('falls back to today on a date or id it cannot use', function (string $field, string $value) {
+    loginAsForMonitor('admin');
+    $today = RawEvent::factory()->create();
+
+    $monitor = Livewire::test(DeviceMonitor::class)->set($field, $value);
+
+    expect($monitor->get('recentEvents')->pluck('id')->all())->toBe([$today->id])
+        ->and($monitor->instance()->isViewingToday())->toBeTrue();
+})->with([
+    'garbage date' => ['feedDate', 'abc'],
+    'impossible date' => ['feedDate', '2026-02-31'],
+    'garbage teacher' => ['feedTeacherId', 'x'],
+    'unknown device' => ['feedDeviceId', '999999'],
+]);
+
+it('reset brings the feed back to today, unfiltered', function () {
+    loginAsForMonitor('admin');
+
+    Livewire::test(DeviceMonitor::class)
+        ->set('feedDate', '2026-09-29')
+        ->set('feedSearch', 'x')
+        ->call('resetFeedFilters')
+        ->assertSet('feedSearch', '')
+        ->assertSet('feedDate', now(config('attendance.timezone'))->toDateString());
 });

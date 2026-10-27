@@ -4,6 +4,7 @@ namespace App\Filament\Pages;
 
 use App\Models\Device;
 use App\Models\RawEvent;
+use App\Models\Teacher;
 use App\Models\TeacherBiometricId;
 use App\Services\Demo\DeviceScanSimulator;
 use BackedEnum;
@@ -11,7 +12,10 @@ use Filament\Notifications\Notification;
 use Filament\Pages\Page;
 use Filament\Support\Icons\Heroicon;
 use Illuminate\Contracts\Support\Htmlable;
+use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Collection;
+use Livewire\Attributes\Url;
 
 /**
  * §1/§7.5's "devices.last_seen_at needs a monitor so a device that is
@@ -62,6 +66,29 @@ class DeviceMonitor extends Page
      */
     public bool $onlyIdentified = false;
 
+    /*
+     * Feed filters, for resolving one case: "what did this teacher scan
+     * that day?". In the URL so the Exception Queue can link straight to a
+     * teacher's day, and so browser back works. Strings, not ints, on
+     * purpose: they arrive from the URL and the browser, and a typed int
+     * property would throw on "abc" instead of falling back — every read
+     * goes through the resolve*() helpers below.
+     */
+
+    /** Y-m-d, school-local; null = today. */
+    #[Url(as: 'date')]
+    public ?string $feedDate = null;
+
+    #[Url(as: 'teacher')]
+    public ?string $feedTeacherId = null;
+
+    #[Url(as: 'device')]
+    public ?string $feedDeviceId = null;
+
+    /** Teacher name, or the raw fingerprint id (finds unmatched scans too). */
+    #[Url(as: 'q')]
+    public string $feedSearch = '';
+
     public const FEED_LIMITS = [25, 50, 100, 250, 500];
 
     public const DEFAULT_FEED_LIMIT = 100;
@@ -84,6 +111,8 @@ class DeviceMonitor extends Page
     public function mount(): void
     {
         $this->selectedDeviceId = Device::query()->where('is_active', true)->value('id');
+        // ??=: a date arriving in the URL (the Exception Queue link) wins.
+        $this->feedDate ??= now(config('attendance.timezone'))->toDateString();
     }
 
     /** @return Collection<int, array{id:int,serial:string,model:?string,corridor:string,ip:?string,last_seen_at:?\Carbon\Carbon,status:string}> */
@@ -119,23 +148,106 @@ class DeviceMonitor extends Page
     }
 
     /**
-     * Ordered by id, not by scan time: id is the insertion order and is
-     * indexed, which keeps a feed that polls every three seconds off a
-     * filesort over an append-only table that only ever grows. For live
-     * events the two orders are the same; a backfill is the exception,
-     * and there the ingestion order is arguably the more useful thing to
-     * see — those rows appearing at the top is the backfill landing.
+     * One school-local day, filtered as asked.
+     *
+     * Today is ordered by id, not by scan time: id is the insertion order
+     * and is indexed, which keeps a feed that polls every three seconds off
+     * a filesort. For live events the two orders are the same; a backfill
+     * is the exception, and there those rows appearing at the top is the
+     * backfill landing. A past day is read as the day's story instead —
+     * earliest scan first.
      *
      * @return Collection<int, RawEvent>
      */
     public function getRecentEventsProperty(): Collection
     {
+        $day = $this->resolvedFeedDay();
+        // Half-open UTC range of the local day: a 23:30 scan in Douala is
+        // that day's, though its UTC date may differ.
+        $start = $day->clone()->utc();
+        $end = $day->clone()->addDay()->utc();
+        $teacher = $this->resolvedFeedTeacher();
+        $deviceId = $this->resolvedFeedDeviceId();
+        $search = trim($this->feedSearch);
+
         return RawEvent::query()
             ->with(['teacher', 'device'])
-            ->when($this->onlyIdentified, fn ($q) => $q->whereNotNull('teacher_id'))
-            ->latest('id')
+            // Same effective-time rule as pairing: device clock, falling
+            // back to server time only when the device sent none.
+            ->where(fn (Builder $q) => $q
+                ->where(fn (Builder $q) => $q->where('event_time_device', '>=', $start)->where('event_time_device', '<', $end))
+                ->orWhere(fn (Builder $q) => $q->whereNull('event_time_device')
+                    ->where('event_time_server', '>=', $start)->where('event_time_server', '<', $end)))
+            ->when($this->onlyIdentified, fn (Builder $q) => $q->whereNotNull('teacher_id'))
+            // scanSourceIds(): a merged duplicate's scans are this teacher's.
+            ->when($teacher, fn (Builder $q) => $q->whereIn('teacher_id', $teacher->scanSourceIds()))
+            ->when($deviceId, fn (Builder $q) => $q->where('device_id', $deviceId))
+            ->when($search !== '', fn (Builder $q) => $q->where(fn (Builder $q) => $q
+                ->where('biometric_id', 'like', "%{$search}%")
+                ->orWhereHas('teacher', fn (Builder $t) => $t->where('full_name', 'like', "%{$search}%"))))
+            ->when(
+                $this->isViewingToday(),
+                fn (Builder $q) => $q->latest('id'),
+                fn (Builder $q) => $q->orderByRaw('COALESCE(event_time_device, event_time_server)')->orderBy('id'),
+            )
             ->limit($this->resolvedFeedLimit())
             ->get();
+    }
+
+    /** Teachers offered in the feed filter. Merged duplicates are left out — their scans show under the real record. */
+    public function getFeedTeachersProperty(): Collection
+    {
+        return Teacher::query()->whereNull('merged_into_id')->orderBy('full_name')->get(['id', 'full_name', 'staff_no']);
+    }
+
+    public function isViewingToday(): bool
+    {
+        return $this->resolvedFeedDay()->isSameDay(now(config('attendance.timezone')));
+    }
+
+    public function hasFeedFilters(): bool
+    {
+        return ! $this->isViewingToday()
+            || $this->resolvedFeedTeacher() !== null
+            || $this->resolvedFeedDeviceId() !== null
+            || trim($this->feedSearch) !== '';
+    }
+
+    public function resetFeedFilters(): void
+    {
+        $this->feedDate = now(config('attendance.timezone'))->toDateString();
+        $this->feedTeacherId = null;
+        $this->feedDeviceId = null;
+        $this->feedSearch = '';
+    }
+
+    /** Start of the chosen school-local day; anything unparseable means today. */
+    public function resolvedFeedDay(): Carbon
+    {
+        $tz = config('attendance.timezone');
+
+        if (is_string($this->feedDate) && preg_match('/^\d{4}-\d{2}-\d{2}$/', $this->feedDate)) {
+            $day = Carbon::createFromFormat('!Y-m-d', $this->feedDate, $tz);
+
+            // createFromFormat rolls 2026-02-31 over to March; refuse it.
+            if ($day !== false && $day->format('Y-m-d') === $this->feedDate) {
+                return $day;
+            }
+        }
+
+        return now($tz)->startOfDay();
+    }
+
+    private function resolvedFeedTeacher(): ?Teacher
+    {
+        return ctype_digit((string) $this->feedTeacherId) ? Teacher::find((int) $this->feedTeacherId) : null;
+    }
+
+    private function resolvedFeedDeviceId(): ?int
+    {
+        return ctype_digit((string) $this->feedDeviceId) && Device::whereKey((int) $this->feedDeviceId)->exists()
+            ? (int) $this->feedDeviceId
+            : null;
     }
 
     /**

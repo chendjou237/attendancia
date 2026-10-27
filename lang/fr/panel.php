@@ -255,6 +255,7 @@ return [
     'pages' => [
 
         'exception_queue' => [
+            'view_scans' => 'Voir les pointages',
             'override_action' => 'Corriger',
             'actual_status' => 'Statut réel',
             'reason_help' => "Obligatoire — ceci devient partie de la piste d'audit (§9, §14).",
@@ -263,6 +264,12 @@ return [
         ],
 
         'device_monitor' => [
+            'all_teachers' => 'Tous les enseignants',
+            'all_devices' => 'Tous les appareils',
+            'search' => 'Recherche',
+            'search_placeholder' => "Nom ou identifiant d'empreinte…",
+            'reset_filters' => 'Réinitialiser',
+            'no_scans_for_filters' => 'Aucun pointage pour ces filtres.',
             'online' => 'En ligne',
             'silent' => 'Silencieux',
             'offline' => 'Hors ligne',

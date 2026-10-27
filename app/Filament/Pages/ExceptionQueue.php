@@ -5,6 +5,7 @@ namespace App\Filament\Pages;
 use App\Enums\PeriodStatus;
 use App\Enums\SessionAnomaly;
 use App\Filament\Actions\RecomputeAttendanceAction;
+use App\Filament\Tables\AttendanceFilters;
 use App\Models\AuditLog;
 use App\Models\PeriodResult;
 use BackedEnum;
@@ -89,7 +90,14 @@ class ExceptionQueue extends Page implements HasTable
             ->columns([
                 TextColumn::make('date')->label(__('panel.common.date'))->date()->sortable(),
                 TextColumn::make('teacher.full_name')->label(__('panel.common.teacher'))->searchable(),
-                TextColumn::make('slot.seq')->label(__('panel.common.period')),
+                // The time alongside the number: resolving a case is always
+                // "what time was this, and did they scan then?".
+                TextColumn::make('slot.seq')
+                    ->label(__('panel.common.period'))
+                    ->sortable()
+                    ->description(fn (PeriodResult $record): ?string => $record->slot
+                        ? substr($record->slot->start_time, 0, 5).'–'.substr($record->slot->end_time, 0, 5)
+                        : null),
                 TextColumn::make('classCode.code')->label(__('panel.common.class')),
                 TextColumn::make('status')->label(__('panel.common.status'))->badge()->color('danger'),
                 TextColumn::make('session.anomaly_code')
@@ -100,7 +108,24 @@ class ExceptionQueue extends Page implements HasTable
                         ? (SessionAnomaly::tryFrom($state)?->getLabel() ?? $state)
                         : null),
             ])
+            ->filters([
+                AttendanceFilters::teacher(),
+                AttendanceFilters::dateRange(defaultToday: false),
+                AttendanceFilters::reason(),
+                AttendanceFilters::classCode(),
+            ])
             ->recordActions([
+                // The scans behind the case, for that teacher and that day —
+                // the evidence to look at before deciding an override.
+                Action::make('viewScans')
+                    ->label(__('panel.pages.exception_queue.view_scans'))
+                    ->icon(Heroicon::OutlinedFingerPrint)
+                    ->color('gray')
+                    ->visible(fn (): bool => DeviceMonitor::canAccess())
+                    ->url(fn (PeriodResult $record): string => DeviceMonitor::getUrl([
+                        'teacher' => $record->teacher_id,
+                        'date' => $record->date->toDateString(),
+                    ])),
                 Action::make('override')
                     ->label(__('panel.pages.exception_queue.override_action'))
                     ->icon(Heroicon::OutlinedPencilSquare)
