@@ -159,7 +159,7 @@ return [
             'half_day_cutoff' => 'Half-day cutoff (last slot that still counts)',
             'slot_option' => ':day, period :period (:start–:end)',
             'scoped_to' => 'Scoped to',
-            'suspended_help' => 'Leave empty to suspend the whole school. Select specific classes for a partial suspension (e.g. one form sitting a sequence exam).',
+            'suspended_help' => 'Leave empty to suspend the whole school. Select specific classes for a partial suspension (e.g. one form sitting a sequence exam). Like a holiday, suspended periods leave the month\'s total: neither present nor absent.',
             'whole_school' => 'Whole school',
             'marked_at' => 'Marked at',
         ],

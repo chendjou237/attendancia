@@ -74,7 +74,9 @@ system runs itself.
 - **Calendar** — mark public holidays, school closures, half-days, and
   suspended-classes days (e.g. Form 5 sitting a sequence exam — you can scope
   a suspension to just the affected class codes rather than cancelling the
-  whole school day). Do this as far ahead as you know about it; a day marked
+  whole school day). Holidays, closures and suspended classes are all simply
+  not expected: those periods leave the month's total rather than being
+  counted present or absent. Do this as far ahead as you know about it; a day marked
   after the fact still recomputes correctly, it's just better to be ahead of
   it.
 - **Rule versions** — the grace windows and pairing rules the engine applies

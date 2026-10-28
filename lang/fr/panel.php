@@ -128,7 +128,7 @@ return [
             'half_day_cutoff' => 'Limite de demi-journée (dernier créneau compté)',
             'slot_option' => ':day, période :period (:start–:end)',
             'scoped_to' => 'Limité à',
-            'suspended_help' => "Laisser vide pour suspendre tout l'établissement. Sélectionner des classes précises pour une suspension partielle (par ex. une séquence d'examen pour un seul niveau).",
+            'suspended_help' => "Laisser vide pour suspendre tout l'établissement. Sélectionner des classes précises pour une suspension partielle (par ex. une séquence d'examen pour un seul niveau). Comme un jour férié, les périodes suspendues sont retirées du total du mois : ni présentes, ni absentes.",
             'whole_school' => "Tout l'établissement",
             'marked_at' => 'Marqué le',
         ],
