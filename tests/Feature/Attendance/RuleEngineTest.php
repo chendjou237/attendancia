@@ -38,6 +38,23 @@ it('reproduces worked example 1 exactly', function () {
     expect($results->pluck('status')->map->value->all())->toBe(['absent', 'present', 'present']);
 });
 
+// Grace includes its last minute, both ends (RuleVersion::MINUTE_SLACK_SECONDS).
+it('counts a scan-in in the 15th minute late and a scan-out in the 15th minute early as present', function () {
+    $f = AttendanceFixture::make(ruleOverrides: ['grace_late_minutes' => 15, 'grace_early_minutes' => 15, 'pair_window_before_minutes' => 15, 'pair_window_after_minutes' => 15, 'min_session_minutes' => 1]);
+    $f->scanAt('07:45:30'); // 15 min 30 s late
+    $f->scanAt('08:09:30'); // 15 min 30 s before the 08:25 end
+
+    expect(computeSession($f)->first()->status)->toBe(PeriodStatus::Present);
+});
+
+it('still marks a 16-minute-late arrival absent', function () {
+    $f = AttendanceFixture::make(ruleOverrides: ['grace_late_minutes' => 15, 'grace_early_minutes' => 15, 'pair_window_before_minutes' => 15, 'pair_window_after_minutes' => 15, 'min_session_minutes' => 1]);
+    $f->scanAt('07:46:00');
+    $f->scanAt('08:25:00');
+
+    expect(computeSession($f)->first()->status)->toBe(PeriodStatus::Absent);
+});
+
 // §5 worked example 2: 13h45–15h35 (2 periods), scan-out 14h30
 // (scan-in at session start) -> P1 present, P2 absent. 1 of 2.
 it('reproduces worked example 2 exactly', function () {

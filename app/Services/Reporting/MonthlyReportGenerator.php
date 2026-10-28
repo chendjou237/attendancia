@@ -192,6 +192,29 @@ class MonthlyReportGenerator
         return $report;
     }
 
+    /**
+     * The TOTAL row of a report table: each column summed over the
+     * snapshot's per-teacher rows. Static and fed the stored rows, so a
+     * frozen report gets its total line without being regenerated.
+     *
+     * @param  array<int, array<string, mixed>>  $teacherRows
+     * @return array{present: int, present_admin: int, absent: int, absent_justified: int, pending: int, total_periods: int, hours_taught: float}
+     */
+    public static function columnTotals(array $teacherRows): array
+    {
+        $rows = collect($teacherRows);
+
+        return [
+            'present' => (int) $rows->sum('present'),
+            'present_admin' => (int) $rows->sum('present_admin'),
+            'absent' => (int) $rows->sum('absent'),
+            'absent_justified' => (int) $rows->sum('absent_justified'),
+            'pending' => (int) $rows->sum('pending'),
+            'total_periods' => (int) $rows->sum('total_periods'),
+            'hours_taught' => round((float) $rows->sum('hours_taught'), 2),
+        ];
+    }
+
     private function summarizeTeacher(Collection $rows): array
     {
         $teacher = $rows->first()->teacher;

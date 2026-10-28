@@ -70,11 +70,13 @@ it('debounces a double-tap into one scan and reports no_scan_out, never a false 
     expect($session->anomaly_code)->toBe(SessionAnomaly::NoScanOut->value);
 });
 
+// After the arrival grace (07:30 + 15 = 07:45:59): two taps close together
+// before it are a repeated arrival instead — see the JOSIAH test below.
 it('marks too_short for two genuinely distinct scans that are not a double-tap', function () {
     $f = AttendanceFixture::make(ruleOverrides: ['min_scan_gap_seconds' => 30, 'min_session_minutes' => 10]);
     $session = pairedSession($f);
-    $f->scanAt('07:28:00');
-    $f->scanAt('07:29:00'); // 60s apart: not debounced, but only 1 minute of coverage
+    $f->scanAt('07:50:00');
+    $f->scanAt('07:51:00'); // 60s apart: not debounced, but only 1 minute of coverage
 
     (new PairingEngine)->pair($session, $f->rule);
     $session->refresh();
@@ -136,6 +138,65 @@ it('reports no_scan_in, not location_mismatch, when the only scan is after the s
     expect($session->state)->toBe(SessionState::Unpaired)
         ->and($session->anomaly_code)->toBe(SessionAnomaly::NoScanIn->value);
 })->with(['enforcement off' => false, 'enforcement on' => true]);
+
+// "15 minutes before" includes the whole 15th minute (ABENA, 2026-10-19:
+// 07:14:55 for 07:30 was refused by five seconds). Fixture rule: 15/15.
+it('accepts a scan-in anywhere in the 15th minute before the start, not 16 minutes', function (string $scan, bool $pairs) {
+    $f = AttendanceFixture::make();
+    $session = pairedSession($f);
+    $f->scanAt($scan);
+    $f->scanAt('08:20:00');
+
+    (new PairingEngine)->pair($session, $f->rule);
+    $session->refresh();
+
+    expect($session->state === SessionState::Paired)->toBe($pairs);
+})->with([
+    '15 min 05 s before' => ['07:14:55', true],
+    '15 min 59 s before' => ['07:14:01', true],
+    '16 min before' => ['07:14:00', false],
+]);
+
+it('accepts a scan-out anywhere in the 15th minute after the end', function () {
+    $f = AttendanceFixture::make(); // ends 08:25
+    $session = pairedSession($f);
+    $f->scanAt('07:28:00');
+    $f->scanAt('08:40:30');
+
+    (new PairingEngine)->pair($session, $f->rule);
+    $session->refresh();
+
+    expect($session->state)->toBe(SessionState::Paired);
+});
+
+// JOSIAH, 2026-10-13: in at 07:20:59, a confirmation tap at 07:32:41 was
+// read as "left at 07:32" and both periods went ABSENT.
+it('treats a second tap before the arrival grace ends as arriving again, not leaving', function () {
+    $f = AttendanceFixture::make();
+    $session = pairedSession($f);
+    $f->scanAt('07:20:59');
+    $f->scanAt('07:32:41');
+
+    (new PairingEngine)->pair($session, $f->rule);
+    $session->refresh();
+
+    expect($session->state)->toBe(SessionState::Unpaired)
+        ->and($session->anomaly_code)->toBe(SessionAnomaly::NoScanOut->value);
+});
+
+it('still pairs the real departure after a repeated arrival tap', function () {
+    $f = AttendanceFixture::make();
+    $session = pairedSession($f);
+    $f->scanAt('07:20:59');
+    $f->scanAt('07:32:41');
+    $f->scanAt('08:24:00');
+
+    (new PairingEngine)->pair($session, $f->rule);
+    $session->refresh()->load('scanOutEvent');
+
+    expect($session->state)->toBe(SessionState::Paired)
+        ->and($session->scanOutEvent->effectiveTime()->setTimezone(config('attendance.timezone'))->format('H:i:s'))->toBe('08:24:00');
+});
 
 // Decision: one raw_event may serve as both the scan-out of session A
 // and the scan-in of session B — no "consumption".

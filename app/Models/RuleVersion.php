@@ -19,6 +19,16 @@ class RuleVersion extends Model
 {
     use HasFactory;
 
+    /**
+     * Every minute threshold here ("15 minutes before", "15 minutes'
+     * grace") includes the whole of its last minute: a 07:14:55 scan is
+     * "15 minutes before" 07:30 to the people reading the rule, and was
+     * being refused for five seconds. Applied symmetrically to every edge
+     * by PairingEngine and RuleEngine (and printed by attendance:explain),
+     * so a window always means what the rule-version screen says.
+     */
+    public const MINUTE_SLACK_SECONDS = 59;
+
     protected function casts(): array
     {
         return [

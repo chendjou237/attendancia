@@ -29,7 +29,12 @@ use Illuminate\Support\Facades\Log;
  * the scan happened" and "when it was ingested" is large enough to be
  * unmissable — the same gap a multi-day outage produces for real.
  *
- * Plus four decisions layered on top of the plain rule:
+ * Every minute edge includes its last minute (RuleVersion::MINUTE_SLACK_SECONDS):
+ * "15 minutes before" accepts 07:14:55 for a 07:30 start.
+ *
+ * Plus five decisions layered on top of the plain rule:
+ *   - a scan before start + grace_late is a repeated arrival, never the
+ *     scan-out (see the scan-out selection in pair())
  *   - debounce: successive scans from the same teacher inside
  *     min_scan_gap_seconds collapse to one before pairing (finding 1.4 —
  *     stops a double-tap from being read as a real scan-in/scan-out pair)
@@ -58,8 +63,13 @@ class PairingEngine
         $sessionStart = Carbon::parse($date.' '.$session->firstSlot->start_time, $tz)->utc();
         $sessionEnd = Carbon::parse($date.' '.$session->lastSlot->end_time, $tz)->utc();
 
-        $windowStart = $sessionStart->clone()->subMinutes($rule->pair_window_before_minutes);
-        $windowEnd = $sessionEnd->clone()->addMinutes($rule->pair_window_after_minutes);
+        $slack = RuleVersion::MINUTE_SLACK_SECONDS;
+        $windowStart = $sessionStart->clone()->subMinutes($rule->pair_window_before_minutes)->subSeconds($slack);
+        $windowEnd = $sessionEnd->clone()->addMinutes($rule->pair_window_after_minutes)->addSeconds($slack);
+        // Until the arrival grace runs out, any further tap is the teacher
+        // arriving again (a confirmation tap, a second terminal), never
+        // leaving — see the scan-out selection below.
+        $arrivalGraceEnd = $sessionStart->clone()->addMinutes($rule->grace_late_minutes)->addSeconds($slack);
 
         $allEvents = $this->debounce(
             RawEvent::query()
@@ -120,9 +130,21 @@ class PairingEngine
         // itself, and without this a lone scan-in self-selects as its own
         // scan-out (0-minute "session") instead of correctly reporting
         // that no scan-out ever arrived.
+        //
+        // And nothing before the arrival grace ends can be the departure.
+        // JOSIAH, 2026-10-13: in at 07:20:59, a second tap at 07:32:41 on
+        // another terminal was read as "left at 07:32" and both periods
+        // went ABSENT. A re-tap is far likelier than walking out twelve
+        // minutes into a lesson; if no later scan exists the session is
+        // pending (no_scan_out) for a human, never a silent absence.
+        $departureFrom = $scanIn->effectiveTime()->greaterThan($arrivalGraceEnd)
+            ? $scanIn->effectiveTime()
+            : $arrivalGraceEnd;
+
         $scanOut = $candidates
             ->filter(fn (RawEvent $e) => $e->id !== $scanIn->id
-                && $e->effectiveTime()->betweenIncluded($scanIn->effectiveTime(), $windowEnd))
+                && $e->effectiveTime()->greaterThanOrEqualTo($departureFrom)
+                && $e->effectiveTime()->lessThanOrEqualTo($windowEnd))
             ->last();
 
         if ($scanOut === null) {

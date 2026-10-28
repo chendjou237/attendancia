@@ -45,41 +45,74 @@
         </tr>
     </table>
 
+    @php
+        // Defaults to every column when rendered without a selection.
+        $columns ??= array_keys(\App\Http\Controllers\MonthlyReportPdfController::columns());
+        $labels = \App\Http\Controllers\MonthlyReportPdfController::columns();
+        $textColumns = ['staff_no', 'type'];
+        // The name always prints, right after the staff number when that is shown.
+        $leading = in_array('staff_no', $columns, true) ? ['staff_no', 'full_name'] : ['full_name'];
+        $order = array_merge($leading, array_values(array_diff($columns, ['staff_no'])));
+    @endphp
     <table class="teachers">
         <thead>
             <tr>
-                <th>{{ __('panel.common.staff_no') }}</th>
-                <th>{{ __('panel.common.teacher') }}</th>
-                <th>{{ __('panel.resources.monthly_reports.type') }}</th>
-                <th class="num">{{ \App\Enums\PeriodStatus::Present->getLabel() }}</th>
-                <th class="num">{{ \App\Enums\PeriodStatus::PresentAdmin->getLabel() }}</th>
-                <th class="num">{{ \App\Enums\PeriodStatus::Absent->getLabel() }}</th>
-                <th class="num">{{ \App\Enums\PeriodStatus::AbsentJustified->getLabel() }}</th>
-                <th class="num">{{ __('panel.resources.monthly_reports.pending') }}</th>
-                <th class="num">{{ __('panel.resources.monthly_reports.total_periods') }}</th>
-                <th class="num">{{ __('panel.resources.monthly_reports.hours') }}</th>
+                @foreach ($order as $key)
+                    @if ($key === 'full_name')
+                        <th>{{ __('panel.common.teacher') }}</th>
+                    @else
+                        <th class="{{ in_array($key, $textColumns, true) ? '' : 'num' }}">{{ $labels[$key] }}</th>
+                    @endif
+                @endforeach
             </tr>
         </thead>
         <tbody>
             @forelse ($snapshot['teachers'] as $row)
                 <tr>
-                    <td>{{ $row['staff_no'] }}</td>
-                    <td>{{ $row['full_name'] }}</td>
-                    <td>{{ \App\Enums\EmploymentType::from($row['employment_type'])->getLabel() }}</td>
-                    <td class="num">{{ $row['present'] }}</td>
-                    <td class="num">{{ $row['present_admin'] }}</td>
-                    <td class="num">{{ $row['absent'] }}</td>
-                    <td class="num">{{ $row['absent_justified'] }}</td>
-                    <td class="num {{ $row['pending'] > 0 ? 'pending-flag' : '' }}">{{ $row['pending'] }}</td>
-                    <td class="num">{{ $row['total_periods'] }}</td>
-                    <td class="num" style="font-weight: bold">{{ $row['hours_taught'] }}</td>
+                    @foreach ($order as $key)
+                        @switch($key)
+                            @case('full_name')
+                                <td>{{ $row['full_name'] }}</td>
+                                @break
+                            @case('staff_no')
+                                <td>{{ $row['staff_no'] }}</td>
+                                @break
+                            @case('type')
+                                <td>{{ \App\Enums\EmploymentType::from($row['employment_type'])->getLabel() }}</td>
+                                @break
+                            @case('pending')
+                                <td class="num {{ $row['pending'] > 0 ? 'pending-flag' : '' }}">{{ $row['pending'] }}</td>
+                                @break
+                            @case('hours_taught')
+                                <td class="num" style="font-weight: bold">{{ $row['hours_taught'] }}</td>
+                                @break
+                            @default
+                                <td class="num">{{ $row[$key] ?? 0 }}</td>
+                        @endswitch
+                    @endforeach
                 </tr>
             @empty
                 <tr>
-                    <td colspan="10" style="text-align: center; color: #888; padding: 12px">{{ __('panel.resources.monthly_reports.no_period_results') }}</td>
+                    <td colspan="{{ count($order) }}" style="text-align: center; color: #888; padding: 12px">{{ __('panel.resources.monthly_reports.no_period_results') }}</td>
                 </tr>
             @endforelse
         </tbody>
+        @if (count($snapshot['teachers']) > 0)
+            @php($sums = \App\Services\Reporting\MonthlyReportGenerator::columnTotals($snapshot['teachers']))
+            <tfoot>
+                <tr style="font-weight: bold; border-top: 2px solid #555">
+                    @foreach ($order as $key)
+                        @if ($key === 'full_name')
+                            <td>{{ __('panel.resources.monthly_reports.total_row') }}</td>
+                        @elseif (in_array($key, $textColumns, true))
+                            <td></td>
+                        @else
+                            <td class="num">{{ $sums[$key] }}</td>
+                        @endif
+                    @endforeach
+                </tr>
+            </tfoot>
+        @endif
     </table>
 
     @include('pdf.partials.footer', ['report' => $report, 'snapshot' => $snapshot])

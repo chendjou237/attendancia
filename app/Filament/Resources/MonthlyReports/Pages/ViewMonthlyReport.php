@@ -4,9 +4,11 @@ namespace App\Filament\Resources\MonthlyReports\Pages;
 
 use App\Enums\ReportState;
 use App\Filament\Resources\MonthlyReports\MonthlyReportResource;
+use App\Http\Controllers\MonthlyReportPdfController;
 use App\Models\AuditLog;
 use App\Services\Reporting\MonthlyReportGenerator;
 use Filament\Actions\Action;
+use Filament\Forms\Components\CheckboxList;
 use Filament\Notifications\Notification;
 use Filament\Resources\Pages\Concerns\InteractsWithRecord;
 use Filament\Resources\Pages\Page;
@@ -27,6 +29,8 @@ class ViewMonthlyReport extends Page
 
     protected string $view = 'filament.resources.monthly-reports.pages.view-monthly-report';
 
+    private const PDF_COLUMNS_SESSION_KEY = 'monthly_report_pdf_columns';
+
     public function mount(int|string $record): void
     {
         $this->record = $this->resolveRecord($record);
@@ -42,13 +46,38 @@ class ViewMonthlyReport extends Page
         $state = $this->record->state;
 
         return [
+            // Pick the columns to print; the last choice is kept for the
+            // session so a regular print layout isn't re-ticked every month.
             Action::make('downloadPdf')
                 ->label(__('panel.common.download_pdf'))
                 ->icon(Heroicon::OutlinedArrowDownTray)
                 ->color('gray')
                 ->visible($this->record->snapshot_json !== null)
-                ->url(fn () => route('monthly-reports.pdf', ['report' => $this->record]))
-                ->openUrlInNewTab(),
+                ->modalHeading(__('panel.resources.monthly_reports.pdf_columns_heading'))
+                ->modalDescription(__('panel.resources.monthly_reports.pdf_columns_help'))
+                ->modalSubmitActionLabel(__('panel.common.download_pdf'))
+                ->schema([
+                    CheckboxList::make('columns')
+                        ->hiddenLabel()
+                        ->options(MonthlyReportPdfController::columns())
+                        ->default(fn (): array => MonthlyReportPdfController::selectedColumns(
+                            implode(',', (array) session(self::PDF_COLUMNS_SESSION_KEY, [])),
+                        ))
+                        ->columns(3)
+                        ->bulkToggleable()
+                        ->required(),
+                ])
+                ->action(function (array $data) {
+                    $columns = MonthlyReportPdfController::selectedColumns(implode(',', $data['columns']));
+                    session([self::PDF_COLUMNS_SESSION_KEY => $columns]);
+                    $pdf = MonthlyReportPdfController::makePdf($this->record, $columns);
+
+                    return response()->streamDownload(
+                        fn () => print ($pdf->output()),
+                        MonthlyReportPdfController::filename($this->record),
+                        ['Content-Type' => 'application/pdf'],
+                    );
+                }),
 
             Action::make('regenerate')
                 ->label(__('panel.resources.monthly_reports.regenerate_action'))

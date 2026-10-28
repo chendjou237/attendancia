@@ -3,8 +3,6 @@
 namespace App\Services\Attendance;
 
 use App\Enums\DayType;
-use App\Enums\PeriodSource;
-use App\Enums\PeriodStatus;
 use App\Models\AttendanceSession;
 use App\Models\CalendarDay;
 use App\Models\PeriodResult;
@@ -20,14 +18,17 @@ use Carbon\CarbonInterface;
  *   public_holiday / school_closure -> no expected sessions, no results
  *   half_day                       -> only slots inside the shortened
  *                                      day are expected
- *   classes_suspended              -> per session: PRESENT_ADMIN with no
- *                                      scan required if the session's
- *                                      class_code is in scope (decision:
- *                                      scoped to class codes, empty scope
- *                                      = whole school); otherwise the
- *                                      normal scan-based path, since a
- *                                      partial suspension leaves other
- *                                      classes running as usual
+ *   classes_suspended              -> per session: not expected at all if
+ *                                      the session's class_code is in
+ *                                      scope (empty scope = whole school)
+ *                                      — no result, out of the month's
+ *                                      total, like a holiday. Until
+ *                                      2026-10 this wrote PRESENT_ADMIN
+ *                                      (paid without a scan); those rows
+ *                                      still read back. Out-of-scope
+ *                                      classes take the normal scan-based
+ *                                      path, since a partial suspension
+ *                                      leaves them running as usual
  *   teaching (default, no calendar_days row)
  *                                   -> normal path for every session
  *
@@ -47,7 +48,6 @@ class DayResolver
         private readonly SessionBuilder $sessionBuilder,
         private readonly PairingEngine $pairingEngine,
         private readonly RuleEngine $ruleEngine,
-        private readonly PeriodResultWriter $writer,
     ) {}
 
     public function resolve(Teacher $teacher, CarbonInterface $date, RuleVersion $rule): void
@@ -75,11 +75,11 @@ class DayResolver
         $sessions = $this->sessionBuilder->persist($teacher, $date, $groupings);
 
         foreach ($sessions as $session) {
-            $isAdministrative = $dayType === DayType::ClassesSuspended
+            $isSuspended = $dayType === DayType::ClassesSuspended
                 && $calendarDay->suspendsClassCode($session->class_code_id);
 
-            if ($isAdministrative) {
-                $this->writeAdministrative($session, $rule, $maxSeq);
+            if ($isSuspended) {
+                $this->retireSessionResults($session);
 
                 continue;
             }
@@ -91,20 +91,22 @@ class DayResolver
         }
     }
 
-    private function writeAdministrative(AttendanceSession $session, RuleVersion $rule, ?int $maxSeq): void
+    /**
+     * A suspended class's periods are not expected that day: like a
+     * holiday, they leave the month's total rather than being paid as
+     * PRESENT_ADMIN (decision, 2026-10). Anything already computed for
+     * them — the day marked after the fact — is retired, never deleted.
+     */
+    private function retireSessionResults(AttendanceSession $session): void
     {
-        $slots = $this->sessionBuilder->periodSlotsFor($session);
+        $slotIds = $this->sessionBuilder->periodSlotsFor($session)->pluck('id');
 
-        if ($maxSeq !== null) {
-            $slots = $slots->filter(fn ($slot) => $slot->seq <= $maxSeq);
-        }
-
-        foreach ($slots as $slot) {
-            $this->writer->write(
-                $session->teacher, $session->date, $slot, $session->classCode,
-                PeriodStatus::PresentAdmin, PeriodSource::Administrative, $rule, $session,
-            );
-        }
+        PeriodResult::query()
+            ->where('teacher_id', $session->teacher_id)
+            ->where('date', $session->date->toDateString())
+            ->whereIn('slot_id', $slotIds)
+            ->where('is_current', true)
+            ->update(['is_current' => false]);
     }
 
     private function clearCurrentResults(Teacher $teacher, CarbonInterface $date): void

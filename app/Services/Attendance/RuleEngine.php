@@ -78,8 +78,10 @@ class RuleEngine
             $periodStart = Carbon::parse($date.' '.$slot->start_time, $tz)->utc();
             $periodEnd = Carbon::parse($date.' '.$slot->end_time, $tz)->utc();
 
-            $requiredStart = $periodStart->clone()->addMinutes($rule->grace_late_minutes);
-            $requiredEnd = $periodEnd->clone()->subMinutes($rule->grace_early_minutes);
+            // Grace includes its last minute, like every rule edge — see
+            // RuleVersion::MINUTE_SLACK_SECONDS.
+            $requiredStart = $periodStart->clone()->addMinutes($rule->grace_late_minutes)->addSeconds(RuleVersion::MINUTE_SLACK_SECONDS);
+            $requiredEnd = $periodEnd->clone()->subMinutes($rule->grace_early_minutes)->subSeconds(RuleVersion::MINUTE_SLACK_SECONDS);
 
             $covers = $scanIn->lessThanOrEqualTo($requiredStart) && $scanOut->greaterThanOrEqualTo($requiredEnd);
 

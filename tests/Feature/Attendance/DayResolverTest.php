@@ -18,7 +18,7 @@ function resolver(): DayResolver
     $builder = new SessionBuilder;
     $writer = new PeriodResultWriter;
 
-    return new DayResolver($builder, new PairingEngine, new RuleEngine($builder, $writer), $writer);
+    return new DayResolver($builder, new PairingEngine, new RuleEngine($builder, $writer));
 }
 
 it('computes a normal teaching day (no calendar_days row) via scan pairing', function () {
@@ -58,7 +58,7 @@ it('retro-marking a computed day as a holiday clears current results without del
     expect(PeriodResult::count())->toBe(1); // still there, just not current
 });
 
-it('applies PRESENT_ADMIN with no scan when the session class_code is in the suspension scope', function () {
+it('expects nothing of a session whose class_code is in the suspension scope', function () {
     $f = AttendanceFixture::make();
     // no scans at all
     $calendarDay = CalendarDay::create(['date' => $f->date->toDateString(), 'day_type' => DayType::ClassesSuspended]);
@@ -66,9 +66,7 @@ it('applies PRESENT_ADMIN with no scan when the session class_code is in the sus
 
     resolver()->resolve($f->teacher, $f->date, $f->rule);
 
-    $result = PeriodResult::current()->where('teacher_id', $f->teacher->id)->first();
-    expect($result->status)->toBe(PeriodStatus::PresentAdmin);
-    expect($result->source)->toBe(PeriodSource::Administrative);
+    expect(PeriodResult::where('teacher_id', $f->teacher->id)->count())->toBe(0);
 });
 
 it('applies the normal scan-based path when the session class_code is NOT in the suspension scope', function () {

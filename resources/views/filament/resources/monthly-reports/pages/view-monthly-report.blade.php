@@ -85,10 +85,15 @@
                                 <th style="padding:0.5rem;text-align:right">{{ \App\Enums\PeriodStatus::Absent->getLabel() }}</th>
                                 <th style="padding:0.5rem;text-align:right">{{ \App\Enums\PeriodStatus::AbsentJustified->getLabel() }}</th>
                                 <th style="padding:0.5rem;text-align:right">{{ __('panel.resources.monthly_reports.pending') }}</th>
+                                <th style="padding:0.5rem;text-align:right">{{ __('panel.resources.monthly_reports.total_periods') }}</th>
                                 <th style="padding:0.5rem;text-align:right">{{ __('panel.resources.monthly_reports.hours') }}</th>
                                 <th style="padding:0.5rem"></th>
                             </tr>
                         </thead>
+                        {{-- Summed here from the snapshot's own rows, not from snapshot
+                             totals: a frozen report (approved / sent to HR) renders the
+                             same without ever being regenerated. --}}
+                        @php($sums = \App\Services\Reporting\MonthlyReportGenerator::columnTotals($snapshot['teachers']))
                         <tbody>
                             @forelse ($snapshot['teachers'] as $row)
                                 <tr style="border-bottom:1px solid rgb(39 39 42)">
@@ -100,6 +105,7 @@
                                     <td style="padding:0.5rem;text-align:right">{{ $row['absent'] }}</td>
                                     <td style="padding:0.5rem;text-align:right">{{ $row['absent_justified'] }}</td>
                                     <td style="padding:0.5rem;text-align:right;{{ $row['pending'] > 0 ? 'color:rgb(248 113 113)' : '' }}">{{ $row['pending'] }}</td>
+                                    <td style="padding:0.5rem;text-align:right">{{ $row['total_periods'] }}</td>
                                     <td style="padding:0.5rem;text-align:right;font-weight:600">{{ $row['hours_taught'] }}</td>
                                     <td style="padding:0.5rem;text-align:right">
                                         <a
@@ -113,12 +119,27 @@
                                 </tr>
                             @empty
                                 <tr>
-                                    <td colspan="10" style="padding:1rem;text-align:center;color:rgb(156 163 175)">
+                                    <td colspan="11" style="padding:1rem;text-align:center;color:rgb(156 163 175)">
                                         {{ __('panel.resources.monthly_reports.no_period_results') }}
                                     </td>
                                 </tr>
                             @endforelse
                         </tbody>
+                        @if (count($snapshot['teachers']) > 0)
+                            <tfoot>
+                                <tr style="border-top:2px solid rgb(113 113 122);font-weight:700">
+                                    <td style="padding:0.5rem" colspan="3">{{ __('panel.resources.monthly_reports.total_row') }}</td>
+                                    <td style="padding:0.5rem;text-align:right">{{ $sums['present'] }}</td>
+                                    <td style="padding:0.5rem;text-align:right">{{ $sums['present_admin'] }}</td>
+                                    <td style="padding:0.5rem;text-align:right">{{ $sums['absent'] }}</td>
+                                    <td style="padding:0.5rem;text-align:right">{{ $sums['absent_justified'] }}</td>
+                                    <td style="padding:0.5rem;text-align:right">{{ $sums['pending'] }}</td>
+                                    <td style="padding:0.5rem;text-align:right">{{ $sums['total_periods'] }}</td>
+                                    <td style="padding:0.5rem;text-align:right">{{ $sums['hours_taught'] }}</td>
+                                    <td></td>
+                                </tr>
+                            </tfoot>
+                        @endif
                     </table>
                 </div>
             </x-filament::card>

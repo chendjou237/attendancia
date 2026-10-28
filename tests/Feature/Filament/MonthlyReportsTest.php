@@ -4,6 +4,7 @@ use App\Enums\PeriodStatus;
 use App\Enums\ReportState;
 use App\Filament\Resources\MonthlyReports\Pages\ListMonthlyReports;
 use App\Filament\Resources\MonthlyReports\Pages\ViewMonthlyReport;
+use App\Http\Controllers\MonthlyReportPdfController;
 use App\Models\AuditLog;
 use App\Models\MonthlyReport;
 use App\Models\PeriodResult;
@@ -137,6 +138,66 @@ it('regenerating a draft report through the page refreshes its snapshot', functi
 
     $report->refresh();
     expect($report->snapshot_json['totals']['present'])->toBe(1);
+});
+
+it('shows each teacher\'s total periods and a TOTAL row, even on a frozen report', function () {
+    actingAsRole('admin');
+    $row = fn (string $name, int $present, int $pending, int $total) => [
+        'teacher_id' => 1, 'staff_no' => $name, 'full_name' => $name, 'employment_type' => 'hourly',
+        'present' => $present, 'present_admin' => 0, 'absent' => 1, 'absent_justified' => 0,
+        'pending' => $pending, 'total_periods' => $total, 'hours_taught' => $present,
+    ];
+    // Sent to HR: never regenerated, so the TOTAL must come from the stored rows.
+    $report = MonthlyReport::factory()->create([
+        'state' => ReportState::SentToHr,
+        'snapshot_json' => [...emptySnapshot(), 'teachers' => [$row('AHANDA', 10, 3, 14), $row('IROI', 20, 5, 26)]],
+    ]);
+
+    Livewire::test(ViewMonthlyReport::class, ['record' => $report->getRouteKey()])
+        ->assertSee(__('panel.resources.monthly_reports.total_periods'))
+        ->assertSeeInOrder(['AHANDA', '14', 'IROI', '26', __('panel.resources.monthly_reports.total_row'), '30', '0', '2', '0', '8', '40', '30']);
+});
+
+it('keeps only known print columns, in print order, and falls back to all', function () {
+    $all = array_keys(MonthlyReportPdfController::columns());
+
+    expect(MonthlyReportPdfController::selectedColumns('hours_taught,bogus,present'))->toBe(['present', 'hours_taught'])
+        ->and(MonthlyReportPdfController::selectedColumns(''))->toBe($all)
+        ->and(MonthlyReportPdfController::selectedColumns('bogus'))->toBe($all);
+});
+
+it('prints only the chosen columns, with the name and a matching TOTAL row', function () {
+    $teachers = [[
+        'teacher_id' => 1, 'staff_no' => 'T-1', 'full_name' => 'AHANDA', 'employment_type' => 'hourly',
+        'present' => 7, 'present_admin' => 0, 'absent' => 3, 'absent_justified' => 0,
+        'pending' => 2, 'total_periods' => 12, 'hours_taught' => 7,
+    ]];
+    $report = MonthlyReport::factory()->create(['snapshot_json' => [...emptySnapshot(), 'teachers' => $teachers]]);
+
+    $html = view('pdf.monthly-report', [
+        'report' => $report, 'snapshot' => $report->snapshot_json, 'columns' => ['present', 'total_periods'],
+    ])->render();
+    $start = strpos($html, 'class="teachers"');
+    $table = substr($html, $start, strpos($html, '</table>', $start) - $start);
+
+    expect($table)->toContain('AHANDA')
+        ->toContain(PeriodStatus::Present->getLabel())
+        ->toContain(__('panel.resources.monthly_reports.total_periods'))
+        ->not->toContain(PeriodStatus::Absent->getLabel())
+        ->not->toContain('T-1')
+        ->toContain(__('panel.resources.monthly_reports.total_row'));
+});
+
+it('downloads the PDF with the chosen columns and remembers the choice', function () {
+    actingAsRole('admin');
+    $report = MonthlyReport::factory()->create(['month' => '2026-10-01', 'state' => ReportState::Draft, 'snapshot_json' => emptySnapshot()]);
+
+    Livewire::test(ViewMonthlyReport::class, ['record' => $report->getRouteKey()])
+        ->callAction('downloadPdf', ['columns' => ['present', 'hours_taught']])
+        ->assertHasNoActionErrors()
+        ->assertFileDownloaded('monthly-report-2026-10.pdf');
+
+    expect(session('monthly_report_pdf_columns'))->toBe(['present', 'hours_taught']);
 });
 
 it('renders the teachers count as a single number, not one per teacher', function () {

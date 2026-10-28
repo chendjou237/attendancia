@@ -148,15 +148,20 @@ class ExplainAttendance extends Command
         $dateString = $date->toDateString();
         $sessionStart = Carbon::parse($dateString.' '.$grouping->firstSlot->start_time, $tz)->utc();
         $sessionEnd = Carbon::parse($dateString.' '.$grouping->lastSlot->end_time, $tz)->utc();
-        $windowStart = $sessionStart->clone()->subMinutes($rule->pair_window_before_minutes);
-        $windowEnd = $sessionEnd->clone()->addMinutes($rule->pair_window_after_minutes);
+        // Mirrors PairingEngine::pair() exactly, slack included, so what this
+        // prints is the window the engine actually used.
+        $slack = RuleVersion::MINUTE_SLACK_SECONDS;
+        $windowStart = $sessionStart->clone()->subMinutes($rule->pair_window_before_minutes)->subSeconds($slack);
+        $windowEnd = $sessionEnd->clone()->addMinutes($rule->pair_window_after_minutes)->addSeconds($slack);
+        $arrivalGraceEnd = $sessionStart->clone()->addMinutes($rule->grace_late_minutes)->addSeconds($slack);
 
         $classCode = ClassCode::find($grouping->classCodeId);
 
         $this->line('Session: '.($classCode?->code ?? '?').' — periods '.$grouping->firstSlot->seq.'–'.$grouping->lastSlot->seq
             .' '.$grouping->firstSlot->start_time.'–'.$grouping->lastSlot->end_time.' (local)');
         $this->line('  scan-in accepted  '.$this->both($windowStart, $tz).' .. '.$this->both($sessionEnd, $tz));
-        $this->line('  scan-out accepted  from the scan-in .. '.$this->both($windowEnd, $tz));
+        $this->line('  scan-out accepted  after the scan-in and after '.$this->both($arrivalGraceEnd, $tz)
+            .' (earlier taps are repeated arrivals) .. '.$this->both($windowEnd, $tz));
 
         $candidates = RawEvent::query()
             ->whereIn('teacher_id', $teacher->scanSourceIds())

@@ -29,7 +29,7 @@ function suspensionResolver(): DayResolver
     $builder = new SessionBuilder;
     $writer = new PeriodResultWriter;
 
-    return new DayResolver($builder, new PairingEngine, new RuleEngine($builder, $writer), $writer);
+    return new DayResolver($builder, new PairingEngine, new RuleEngine($builder, $writer));
 }
 
 it('suspends every class when no class codes are attached to the calendar day (whole-school scope)', function () {
